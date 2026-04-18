@@ -1,6 +1,7 @@
 import { useState } from "react";
 import "./App.css";
 import OperatorGraph from "./components/OperatorGraph";
+import { buildExecutionPlan, type ExecutionStep } from "./helpers/executionPlan";
 import { optimizeAlgebra, summarizeOptimization } from "./helpers/optimizer";
 import { buildOperatorGraph, type OperatorGraphData } from "./helpers/operatorGraph";
 import { parseSqlQuery } from "./helpers/sqlParser";
@@ -15,6 +16,7 @@ interface ProcessResult {
   optimizedAlgebra: string;
   rawGraph: OperatorGraphData;
   optimizedGraph: OperatorGraphData;
+  executionPlan: ExecutionStep[];
   optimizationNotes: string[];
 }
 
@@ -49,6 +51,7 @@ function App() {
         optimizedAlgebra: algebraToString(optimizedTree),
         rawGraph: buildOperatorGraph(rawTree),
         optimizedGraph: buildOperatorGraph(optimizedTree),
+        executionPlan: buildExecutionPlan(optimizedTree),
         optimizationNotes: summarizeOptimization(optimizedTree),
       });
       setGraphView("optimized");
@@ -143,6 +146,26 @@ function App() {
                   <li key={`${note}-${index}`}>{note}</li>
                 ))}
               </ul>
+            </section>
+
+            <section className="panel result-section execution-plan">
+              <h2>Plano de Execução</h2>
+              <ol>
+                {result.executionPlan.map((step) => (
+                  <li key={step.resultName}>
+                    <div className="step-topline">
+                      <span className="step-order">#{step.order}</span>
+                      <span className="step-operation">{step.operation}</span>
+                      <span className="step-result">{step.resultName}</span>
+                    </div>
+                    <p className="step-description">{step.description}</p>
+                    <p className="step-deps">
+                      Dependências:{" "}
+                      {step.dependsOn.length > 0 ? step.dependsOn.join(", ") : "nenhuma"}
+                    </p>
+                  </li>
+                ))}
+              </ol>
             </section>
           </>
         )}

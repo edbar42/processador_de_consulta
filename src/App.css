@@ -187,6 +187,58 @@
   margin-top: 10px;
 }
 
+.execution-plan ol {
+  margin: 0;
+  padding-left: 24px;
+}
+
+.execution-plan li + li {
+  margin-top: 14px;
+}
+
+.execution-plan li {
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: #f8f4eb;
+}
+
+.step-topline {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.step-order {
+  font-weight: 700;
+  color: #274a77;
+}
+
+.step-operation {
+  font-weight: 700;
+  color: #8a461b;
+}
+
+.step-result {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(39, 74, 119, 0.08);
+  color: #274a77;
+  font: 0.86rem/1.2 "IBM Plex Mono", "SFMono-Regular", monospace;
+}
+
+.step-description,
+.step-deps {
+  margin: 0;
+  color: #5a4c3c;
+}
+
+.step-deps {
+  margin-top: 6px;
+  font-size: 0.92rem;
+}
+
 @media (max-width: 860px) {
   .app-container {
     padding: 28px 16px 44px;
