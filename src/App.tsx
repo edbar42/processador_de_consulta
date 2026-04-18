@@ -20,11 +20,42 @@ interface ProcessResult {
   optimizationNotes: string[];
 }
 
+const TEST_QUERIES = [
+  {
+    label: "Clientes com pedidos",
+    query:
+      "SELECT Cliente.Nome, Pedido.DataPedido FROM Cliente JOIN Pedido ON Cliente.idCliente = Pedido.Cliente_idCliente WHERE Pedido.ValorTotalPedido > 100",
+  },
+  {
+    label: "Pedidos por status",
+    query:
+      "SELECT Cliente.Nome, Status.Descricao FROM Cliente JOIN Pedido ON Cliente.idCliente = Pedido.Cliente_idCliente JOIN Status ON Pedido.Status_idStatus = Status.idStatus WHERE Status.idStatus = 1 AND Pedido.ValorTotalPedido > 100",
+  },
+  {
+    label: "Produtos e categorias",
+    query:
+      "SELECT Produto.Nome, Categoria.Descricao FROM Produto JOIN Categoria ON Produto.Categoria_idCategoria = Categoria.idCategoria WHERE Produto.Preco >= 50",
+  },
+  {
+    label: "Clientes e enderecos",
+    query:
+      "SELECT Cliente.Nome, Endereco.Cidade, Endereco.UF FROM Cliente JOIN Endereco ON Cliente.idCliente = Endereco.Cliente_idCliente WHERE Endereco.UF = 'CE'",
+  },
+] as const;
+
 function App() {
   const [query, setQuery] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [result, setResult] = useState<ProcessResult | null>(null);
   const [graphView, setGraphView] = useState<GraphView>("optimized");
+  const [showTestQueries, setShowTestQueries] = useState(false);
+
+  function applyTestQuery(nextQuery: string) {
+    setQuery(nextQuery);
+    setErro(null);
+    setResult(null);
+    setShowTestQueries(false);
+  }
 
   function handleProcessar() {
     setErro(null);
@@ -67,12 +98,7 @@ function App() {
     <div className="app-shell">
       <div className="app-container">
         <header className="hero">
-          <p className="eyebrow">Banco de Dados</p>
           <h1>Processador de Consultas</h1>
-          <p className="hero-copy">
-            Valide a consulta SQL, visualize a álgebra relacional, o grafo de
-            operadores e o plano de execução otimizado.
-          </p>
         </header>
 
         <section className="panel input-panel">
@@ -81,12 +107,41 @@ function App() {
             id="sql-input"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="SELECT Cliente.Nome, Pedido.DataPedido FROM Cliente JOIN Pedido ON Cliente.idCliente = Pedido.Cliente_idCliente WHERE Pedido.ValorTotalPedido > 100"
+            placeholder="Digite sua query SQL aqui"
             rows={5}
           />
-          <button type="button" onClick={handleProcessar}>
-            Processar
-          </button>
+          <div className="input-actions">
+            <div className="test-query-picker">
+              <button
+                type="button"
+                className="secondary-action"
+                onClick={() => setShowTestQueries((current) => !current)}
+                aria-expanded={showTestQueries}
+                aria-haspopup="true"
+              >
+                Queries de Teste
+              </button>
+              {showTestQueries && (
+                <div className="test-query-menu">
+                  {TEST_QUERIES.map((item) => (
+                    <button
+                      key={item.label}
+                      type="button"
+                      className="test-query-option"
+                      onClick={() => applyTestQuery(item.query)}
+                    >
+                      <span>{item.label}</span>
+                      <code>{item.query}</code>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button type="button" className="primary-action" onClick={handleProcessar}>
+              Processar
+            </button>
+          </div>
         </section>
 
         {erro && (
