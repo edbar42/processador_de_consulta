@@ -1,21 +1,28 @@
 import { useState } from "react";
 import "./App.css";
 import OperatorGraph from "./components/OperatorGraph";
+import { optimizeAlgebra, summarizeOptimization } from "./helpers/optimizer";
 import { buildOperatorGraph, type OperatorGraphData } from "./helpers/operatorGraph";
 import { parseSqlQuery } from "./helpers/sqlParser";
 import { schemaMetadata } from "./helpers/schemas";
 import { algebraToString, queryToAlgebra } from "./helpers/sqlToAlgebra";
 import validarConsulta from "./helpers/validador_query";
 
+type GraphView = "original" | "optimized";
+
 interface ProcessResult {
-  algebra: string;
-  graph: OperatorGraphData;
+  rawAlgebra: string;
+  optimizedAlgebra: string;
+  rawGraph: OperatorGraphData;
+  optimizedGraph: OperatorGraphData;
+  optimizationNotes: string[];
 }
 
 function App() {
   const [query, setQuery] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [result, setResult] = useState<ProcessResult | null>(null);
+  const [graphView, setGraphView] = useState<GraphView>("optimized");
 
   function handleProcessar() {
     setErro(null);
@@ -34,16 +41,24 @@ function App() {
 
     try {
       const parsed = parseSqlQuery(query, schemaMetadata);
-      const algebraTree = queryToAlgebra(parsed);
+      const rawTree = queryToAlgebra(parsed);
+      const optimizedTree = optimizeAlgebra(rawTree, parsed, schemaMetadata);
 
       setResult({
-        algebra: algebraToString(algebraTree),
-        graph: buildOperatorGraph(algebraTree),
+        rawAlgebra: algebraToString(rawTree),
+        optimizedAlgebra: algebraToString(optimizedTree),
+        rawGraph: buildOperatorGraph(rawTree),
+        optimizedGraph: buildOperatorGraph(optimizedTree),
+        optimizationNotes: summarizeOptimization(optimizedTree),
       });
+      setGraphView("optimized");
     } catch (error) {
       setErro(error instanceof Error ? error.message : "Erro ao processar a consulta.");
     }
   }
+
+  const activeGraph =
+    graphView === "original" ? result?.rawGraph : result?.optimizedGraph;
 
   return (
     <div className="app-shell">
@@ -81,8 +96,13 @@ function App() {
         {result && (
           <>
             <section className="panel result-section">
-              <h2>Álgebra Relacional</h2>
-              <pre className="algebra-expr">{result.algebra}</pre>
+              <h2>Álgebra Relacional Original</h2>
+              <pre className="algebra-expr">{result.rawAlgebra}</pre>
+            </section>
+
+            <section className="panel result-section">
+              <h2>Álgebra Relacional Otimizada</h2>
+              <pre className="algebra-expr">{result.optimizedAlgebra}</pre>
             </section>
 
             <section className="panel graph-panel">
@@ -90,13 +110,39 @@ function App() {
                 <div>
                   <h2>Grafo de Operadores</h2>
                   <p className="section-copy">
-                    A raiz representa a projeção final e as folhas representam as tabelas
-                    usadas na consulta.
+                    Alternar entre a estratégia original e a versão otimizada da execução.
                   </p>
+                </div>
+                <div className="graph-toggle" role="tablist" aria-label="Modo do grafo">
+                  <button
+                    type="button"
+                    className={graphView === "original" ? "is-active" : ""}
+                    onClick={() => setGraphView("original")}
+                  >
+                    Original
+                  </button>
+                  <button
+                    type="button"
+                    className={graphView === "optimized" ? "is-active" : ""}
+                    onClick={() => setGraphView("optimized")}
+                  >
+                    Otimizado
+                  </button>
                 </div>
               </div>
 
-              <OperatorGraph nodes={result.graph.nodes} edges={result.graph.edges} />
+              {activeGraph && (
+                <OperatorGraph nodes={activeGraph.nodes} edges={activeGraph.edges} />
+              )}
+            </section>
+
+            <section className="panel result-section">
+              <h2>Heurísticas Aplicadas</h2>
+              <ul className="notes-list">
+                {result.optimizationNotes.map((note, index) => (
+                  <li key={`${note}-${index}`}>{note}</li>
+                ))}
+              </ul>
             </section>
           </>
         )}
