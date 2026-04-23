@@ -13,7 +13,7 @@ import {
 import { parseSqlQuery } from "./helpers/sqlParser";
 import { schemaMetadata } from "./helpers/schemas";
 import { algebraToString, queryToAlgebra } from "./helpers/sqlToAlgebra";
-import validarConsulta from "./helpers/validador_query";
+import validarConsulta from "./helpers/validarConsulta";
 import { TestQueries } from "./helpers/testQueries";
 
 type GraphView = "original" | "optimized";
@@ -51,8 +51,8 @@ function App() {
     }
 
     const validacao = validarConsulta(query, schemaMetadata);
-    if (!validacao.valida) {
-      setErro(validacao.erro ?? "Consulta inválida.");
+    if (!validacao.valid) {
+      setErro(validacao.error ?? "Consulta inválida.");
       return;
     }
 

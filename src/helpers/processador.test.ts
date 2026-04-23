@@ -3,8 +3,12 @@ import { buildExecutionPlan } from "./executionPlan";
 import { optimizeAlgebra } from "./optimizer";
 import { schemaMetadata } from "./schemas";
 import { parseSqlQuery, type ParsedQuery } from "./sqlParser";
-import { algebraToString, queryToAlgebra, type AlgebraNode } from "./sqlToAlgebra";
-import validarConsulta from "./validador_query";
+import {
+  algebraToString,
+  queryToAlgebra,
+  type AlgebraNode,
+} from "./sqlToAlgebra";
+import validarConsulta from "./validarConsulta";
 
 function assertUnaryNode(
   node: AlgebraNode,
@@ -18,7 +22,9 @@ function assertUnaryNode(
   return node;
 }
 
-function assertJoinNode(node: AlgebraNode): Extract<AlgebraNode, { type: "join" }> {
+function assertJoinNode(
+  node: AlgebraNode,
+): Extract<AlgebraNode, { type: "join" }> {
   expect(node.type).toBe("join");
   if (node.type !== "join") {
     throw new Error("Expected join node");
@@ -27,7 +33,10 @@ function assertJoinNode(node: AlgebraNode): Extract<AlgebraNode, { type: "join" 
   return node;
 }
 
-function findTableBranch(node: AlgebraNode, tableName: string): AlgebraNode | null {
+function findTableBranch(
+  node: AlgebraNode,
+  tableName: string,
+): AlgebraNode | null {
   switch (node.type) {
     case "table":
       return node.relation.tableName === tableName ? node : null;
@@ -35,7 +44,10 @@ function findTableBranch(node: AlgebraNode, tableName: string): AlgebraNode | nu
     case "projection":
       return findTableBranch(node.child, tableName);
     case "join":
-      return findTableBranch(node.left, tableName) ?? findTableBranch(node.right, tableName);
+      return (
+        findTableBranch(node.left, tableName) ??
+        findTableBranch(node.right, tableName)
+      );
   }
 }
 
@@ -69,7 +81,9 @@ describe("parseSqlQuery e validarConsulta", () => {
   });
 
   it("rejeita tabela desconhecida", () => {
-    expect(validarConsulta("SELECT nome FROM Funcionario", schemaMetadata)).toEqual({
+    expect(
+      validarConsulta("SELECT nome FROM Funcionario", schemaMetadata),
+    ).toEqual({
       valida: false,
       erro: "Tabela não encontrada: funcionario",
     });
@@ -96,7 +110,10 @@ describe("parseSqlQuery e validarConsulta", () => {
 
   it("rejeita operador não suportado", () => {
     expect(
-      validarConsulta("SELECT Nome FROM Cliente WHERE idCliente != 1", schemaMetadata),
+      validarConsulta(
+        "SELECT Nome FROM Cliente WHERE idCliente != 1",
+        schemaMetadata,
+      ),
     ).toEqual({
       valida: false,
       erro: "Sintaxe SQL básica inválida ou comandos não suportados.",
@@ -155,10 +172,14 @@ describe("otimização e plano de execução", () => {
     if (statusBranch?.type !== "table") {
       throw new Error("Expected status branch to end at a table node");
     }
-    expect(rootJoin.left.type === "join" || rootJoin.right.type === "join").toBe(true);
+    expect(
+      rootJoin.left.type === "join" || rootJoin.right.type === "join",
+    ).toBe(true);
     expect(statusBranch.relation.tableName).toBe("status");
     expect(algebraToString(optimized)).toContain("status.idstatus = 1");
-    expect(algebraToString(optimized)).toContain("pedido.valortotalpedido > 100");
+    expect(algebraToString(optimized)).toContain(
+      "pedido.valortotalpedido > 100",
+    );
   });
 
   it("gera um plano de execução pós-ordem com resultados estáveis", () => {
@@ -166,7 +187,11 @@ describe("otimização e plano de execução", () => {
       "SELECT Cliente.Nome FROM Cliente JOIN Pedido ON Cliente.idCliente = Pedido.Cliente_idCliente WHERE Pedido.ValorTotalPedido > 100",
       schemaMetadata,
     );
-    const optimized = optimizeAlgebra(queryToAlgebra(parsed), parsed, schemaMetadata);
+    const optimized = optimizeAlgebra(
+      queryToAlgebra(parsed),
+      parsed,
+      schemaMetadata,
+    );
     const plan = buildExecutionPlan(optimized);
 
     expect(plan.map((step) => step.order)).toEqual(
@@ -210,6 +235,8 @@ describe("otimização e plano de execução", () => {
 
     expect(() =>
       optimizeAlgebra(queryToAlgebra(parsed), parsed, schemaMetadata),
-    ).toThrow("Não foi possível otimizar a consulta sem criar produto cartesiano.");
+    ).toThrow(
+      "Não foi possível otimizar a consulta sem criar produto cartesiano.",
+    );
   });
 });
