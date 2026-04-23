@@ -1,13 +1,20 @@
 import { useState } from "react";
 import "./App.css";
 import OperatorGraph from "./components/OperatorGraph";
-import { buildExecutionPlan, type ExecutionStep } from "./helpers/executionPlan";
+import {
+  buildExecutionPlan,
+  type ExecutionStep,
+} from "./helpers/executionPlan";
 import { optimizeAlgebra, summarizeOptimization } from "./helpers/optimizer";
-import { buildOperatorGraph, type OperatorGraphData } from "./helpers/operatorGraph";
+import {
+  buildOperatorGraph,
+  type OperatorGraphData,
+} from "./helpers/operatorGraph";
 import { parseSqlQuery } from "./helpers/sqlParser";
 import { schemaMetadata } from "./helpers/schemas";
 import { algebraToString, queryToAlgebra } from "./helpers/sqlToAlgebra";
 import validarConsulta from "./helpers/validador_query";
+import { TestQueries } from "./helpers/testQueries";
 
 type GraphView = "original" | "optimized";
 
@@ -19,29 +26,6 @@ interface ProcessResult {
   executionPlan: ExecutionStep[];
   optimizationNotes: string[];
 }
-
-const TEST_QUERIES = [
-  {
-    label: "Clientes com pedidos",
-    query:
-      "SELECT Cliente.Nome, Pedido.DataPedido FROM Cliente JOIN Pedido ON Cliente.idCliente = Pedido.Cliente_idCliente WHERE Pedido.ValorTotalPedido > 100",
-  },
-  {
-    label: "Pedidos por status",
-    query:
-      "SELECT Cliente.Nome, Status.Descricao FROM Cliente JOIN Pedido ON Cliente.idCliente = Pedido.Cliente_idCliente JOIN Status ON Pedido.Status_idStatus = Status.idStatus WHERE Status.idStatus = 1 AND Pedido.ValorTotalPedido > 100",
-  },
-  {
-    label: "Produtos e categorias",
-    query:
-      "SELECT Produto.Nome, Categoria.Descricao FROM Produto JOIN Categoria ON Produto.Categoria_idCategoria = Categoria.idCategoria WHERE Produto.Preco >= 50",
-  },
-  {
-    label: "Clientes e enderecos",
-    query:
-      "SELECT Cliente.Nome, Endereco.Cidade, Endereco.UF FROM Cliente JOIN Endereco ON Cliente.idCliente = Endereco.Cliente_idCliente WHERE Endereco.UF = 'CE'",
-  },
-] as const;
 
 function App() {
   const [query, setQuery] = useState("");
@@ -87,7 +71,11 @@ function App() {
       });
       setGraphView("optimized");
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Erro ao processar a consulta.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Erro ao processar a consulta.",
+      );
     }
   }
 
@@ -123,7 +111,7 @@ function App() {
               </button>
               {showTestQueries && (
                 <div className="test-query-menu">
-                  {TEST_QUERIES.map((item) => (
+                  {TestQueries.map((item) => (
                     <button
                       key={item.label}
                       type="button"
@@ -138,7 +126,11 @@ function App() {
               )}
             </div>
 
-            <button type="button" className="primary-action" onClick={handleProcessar}>
+            <button
+              type="button"
+              className="primary-action"
+              onClick={handleProcessar}
+            >
               Processar
             </button>
           </div>
@@ -168,10 +160,15 @@ function App() {
                 <div>
                   <h2>Grafo de Operadores</h2>
                   <p className="section-copy">
-                    Alternar entre a estratégia original e a versão otimizada da execução.
+                    Alternar entre a estratégia original e a versão otimizada da
+                    execução.
                   </p>
                 </div>
-                <div className="graph-toggle" role="tablist" aria-label="Modo do grafo">
+                <div
+                  className="graph-toggle"
+                  role="tablist"
+                  aria-label="Modo do grafo"
+                >
                   <button
                     type="button"
                     className={graphView === "original" ? "is-active" : ""}
@@ -190,7 +187,10 @@ function App() {
               </div>
 
               {activeGraph && (
-                <OperatorGraph nodes={activeGraph.nodes} edges={activeGraph.edges} />
+                <OperatorGraph
+                  nodes={activeGraph.nodes}
+                  edges={activeGraph.edges}
+                />
               )}
             </section>
 
@@ -216,7 +216,9 @@ function App() {
                     <p className="step-description">{step.description}</p>
                     <p className="step-deps">
                       Dependências:{" "}
-                      {step.dependsOn.length > 0 ? step.dependsOn.join(", ") : "nenhuma"}
+                      {step.dependsOn.length > 0
+                        ? step.dependsOn.join(", ")
+                        : "nenhuma"}
                     </p>
                   </li>
                 ))}
