@@ -84,15 +84,15 @@ describe("parseSqlQuery e validarConsulta", () => {
     expect(
       validarConsulta("SELECT nome FROM Funcionario", schemaMetadata),
     ).toEqual({
-      valida: false,
-      erro: "Tabela não encontrada: funcionario",
+      valid: false,
+      error: "Tabela não encontrada: funcionario",
     });
   });
 
   it("rejeita atributo desconhecido", () => {
     expect(validarConsulta("SELECT cpf FROM Cliente", schemaMetadata)).toEqual({
-      valida: false,
-      erro: "Atributo não reconhecido: cpf",
+      valid: false,
+      error: "Atributo não reconhecido: cpf",
     });
   });
 
@@ -103,8 +103,8 @@ describe("parseSqlQuery e validarConsulta", () => {
         schemaMetadata,
       ),
     ).toEqual({
-      valida: false,
-      erro: "Atributo ambíguo: descricao",
+      valid: false,
+      error: "Atributo ambíguo: descricao",
     });
   });
 
@@ -115,8 +115,8 @@ describe("parseSqlQuery e validarConsulta", () => {
         schemaMetadata,
       ),
     ).toEqual({
-      valida: false,
-      erro: "Sintaxe SQL básica inválida ou comandos não suportados.",
+      valid: false,
+      error: "Sintaxe SQL básica inválida ou comandos não suportados.",
     });
   });
 
@@ -127,8 +127,8 @@ describe("parseSqlQuery e validarConsulta", () => {
         schemaMetadata,
       ),
     ).toEqual({
-      valida: false,
-      erro: "A junção com pedido deve ligar a nova tabela a uma relação já em uso.",
+      valid: false,
+      error: "A junção com pedido deve ligar a nova tabela a uma relação já em uso.",
     });
   });
 });

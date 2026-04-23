@@ -31,7 +31,7 @@ export interface ParsedQuery {
 }
 
 const KEYWORDS = new Set(["select", "from", "join", "on", "where", "and"]);
-const OPERATORS: PredicateOperator[] = ["<=", ">=", "<>", "=", ">", "<"];
+const OPERATOR_REGEX = /^(.+?)\s*(<=|>=|<>|=|>|<)\s*(.+)$/;
 
 export function parseSqlQuery(query: string, schema: Schema): ParsedQuery {
   const normalized = normalizeSql(query);
@@ -48,22 +48,24 @@ export function parseSqlQuery(query: string, schema: Schema): ParsedQuery {
     throw new Error("A consulta deve iniciar com SELECT.");
   }
 
-  const fromIndex = findKeywordOutsideGroups(normalized, "from");
-  if (fromIndex === -1) {
+  const fromMatch = normalized.match(/\bFROM\b/i);
+  if (!fromMatch || fromMatch.index === undefined) {
     throw new Error("Cláusula FROM obrigatória.");
   }
 
-  const selectPart = normalized.slice("select".length, fromIndex).trim();
-  const afterFrom = normalized.slice(fromIndex + "from".length).trim();
+  const selectPart = normalized.slice("select".length, fromMatch.index).trim();
+  const afterFrom = normalized.slice(fromMatch.index + "from".length).trim();
   if (!selectPart || !afterFrom) {
     throw new Error("Consulta SQL incompleta.");
   }
 
-  const whereIndex = findKeywordOutsideGroups(afterFrom, "where");
-  const sourcePart =
-    whereIndex === -1 ? afterFrom : afterFrom.slice(0, whereIndex).trim();
-  const wherePart =
-    whereIndex === -1 ? "" : afterFrom.slice(whereIndex + "where".length).trim();
+  const whereMatch = afterFrom.match(/\bWHERE\b/i);
+  const sourcePart = whereMatch?.index !== undefined
+    ? afterFrom.slice(0, whereMatch.index).trim()
+    : afterFrom;
+  const wherePart = whereMatch?.index !== undefined
+    ? afterFrom.slice(whereMatch.index + "where".length).trim()
+    : "";
 
   const { from, joins } = parseRelations(sourcePart, schema);
   const relations = getQueryRelations({ from, joins, select: "*", where: [] });
@@ -112,36 +114,24 @@ function parseRelations(
   sourcePart: string,
   schema: Schema,
 ): { from: RelationRef; joins: { relation: RelationRef; predicate: Predicate }[] } {
-  const firstJoinIndex = findKeywordOutsideGroups(sourcePart, "join");
-  const fromSpec =
-    firstJoinIndex === -1
-      ? sourcePart.trim()
-      : sourcePart.slice(0, firstJoinIndex).trim();
-  let remainder =
-    firstJoinIndex === -1 ? "" : sourcePart.slice(firstJoinIndex).trim();
+  const segments = sourcePart.split(/\bJOIN\b/i);
+  const fromSpec = segments[0].trim();
 
   const usedIds = new Set<string>();
   const from = parseRelationSpec(fromSpec, schema, usedIds);
   const joins: { relation: RelationRef; predicate: Predicate }[] = [];
   const scopedRelations: RelationRef[] = [from];
 
-  while (remainder) {
-    if (!startsWithKeyword(remainder, "join")) {
-      throw new Error("Sintaxe inválida após a cláusula FROM.");
-    }
-
-    const afterJoin = remainder.slice("join".length).trim();
-    const onIndex = findKeywordOutsideGroups(afterJoin, "on");
-    if (onIndex === -1) {
+  for (let i = 1; i < segments.length; i += 1) {
+    const segment = segments[i].trim();
+    const onMatch = segment.match(/\bON\b/i);
+    if (!onMatch || onMatch.index === undefined) {
       throw new Error("JOIN sem cláusula ON.");
     }
 
-    const relationSpec = afterJoin.slice(0, onIndex).trim();
+    const relationSpec = segment.slice(0, onMatch.index).trim();
     const relation = parseRelationSpec(relationSpec, schema, usedIds);
-    const afterOn = afterJoin.slice(onIndex + "on".length).trim();
-    const nextJoinIndex = findKeywordOutsideGroups(afterOn, "join");
-    const predicateSource =
-      nextJoinIndex === -1 ? afterOn : afterOn.slice(0, nextJoinIndex).trim();
+    const predicateSource = segment.slice(onMatch.index + "on".length).trim();
 
     if (!predicateSource) {
       throw new Error("Condição de JOIN vazia.");
@@ -161,7 +151,6 @@ function parseRelations(
 
     joins.push({ relation, predicate });
     scopedRelations.push(relation);
-    remainder = nextJoinIndex === -1 ? "" : afterOn.slice(nextJoinIndex).trim();
   }
 
   return { from, joins };
@@ -219,15 +208,15 @@ function parsePredicateGroup(
   relations: RelationRef[],
   schema: Schema,
 ): Predicate[] {
-  const simplified = stripWrappingParentheses(predicateGroup.trim());
-  const fragments = splitTopLevelAnd(simplified);
+  const simplified = stripOuterParens(predicateGroup.trim());
+  const fragments = simplified.split(/\bAND\b/i);
 
   if (fragments.length === 0) {
     throw new Error("Condição WHERE vazia.");
   }
 
   return fragments.map((fragment) =>
-    parsePredicate(stripWrappingParentheses(fragment.trim()), relations, schema),
+    parsePredicate(stripOuterParens(fragment.trim()), relations, schema),
   );
 }
 
@@ -244,14 +233,14 @@ function parsePredicate(
     throw new Error("O operador OR não é suportado.");
   }
 
-  const operatorMatch = findPredicateOperator(fragment);
-  if (!operatorMatch) {
+  const match = fragment.match(OPERATOR_REGEX);
+  if (!match) {
     throw new Error(`Predicado inválido: ${fragment}`);
   }
 
-  const { operator, index } = operatorMatch;
-  const leftSource = fragment.slice(0, index).trim();
-  const rightSource = fragment.slice(index + operator.length).trim();
+  const leftSource = match[1].trim();
+  const operator = match[2] as PredicateOperator;
+  const rightSource = match[3].trim();
 
   if (!leftSource || !rightSource) {
     throw new Error(`Predicado inválido: ${fragment}`);
@@ -357,173 +346,25 @@ function resolveQualifiedRelation(
   return candidates[0];
 }
 
-function splitTopLevelAnd(expression: string): string[] {
-  const parts: string[] = [];
-  let depth = 0;
-  let inQuote = false;
-  let current = "";
-  let index = 0;
-
-  while (index < expression.length) {
-    const character = expression[index];
-
-    if (character === "'") {
-      inQuote = !inQuote;
-      current += character;
-      index += 1;
-      continue;
-    }
-
-    if (!inQuote) {
-      if (character === "(") {
-        depth += 1;
-      } else if (character === ")") {
-        depth -= 1;
-        if (depth < 0) {
-          throw new Error("Erro de sintaxe: parênteses desbalanceados.");
-        }
-      }
-
-      if (
-        depth === 0 &&
-        expression.slice(index, index + 3).toLowerCase() === "and" &&
-        isKeywordBoundary(expression[index - 1]) &&
-        isKeywordBoundary(expression[index + 3])
-      ) {
-        parts.push(current.trim());
-        current = "";
-        index += 3;
-        continue;
-      }
-    }
-
-    current += character;
-    index += 1;
-  }
-
-  if (depth !== 0 || inQuote) {
-    throw new Error("Erro de sintaxe: parênteses ou aspas desbalanceados.");
-  }
-
-  if (current.trim()) {
-    parts.push(current.trim());
-  }
-
-  return parts;
-}
-
-function stripWrappingParentheses(fragment: string): string {
-  let current = fragment.trim();
-
-  while (current.startsWith("(") && current.endsWith(")")) {
+function stripOuterParens(text: string): string {
+  let current = text;
+  while (/^\(.*\)$/.test(current)) {
     const inner = current.slice(1, -1).trim();
-    if (findClosingParenthesis(current, 0) !== current.length - 1) {
-      break;
-    }
+    // Verify parens are balanced in inner — if not, outer parens aren't wrapping
+    if (!parensBalanced(inner)) break;
     current = inner;
   }
-
   return current;
 }
 
-function findPredicateOperator(
-  fragment: string,
-): { operator: PredicateOperator; index: number } | null {
+function parensBalanced(text: string): boolean {
   let depth = 0;
-  let inQuote = false;
-
-  for (let index = 0; index < fragment.length; index += 1) {
-    const character = fragment[index];
-
-    if (character === "'") {
-      inQuote = !inQuote;
-      continue;
-    }
-
-    if (inQuote) {
-      continue;
-    }
-
-    if (character === "(") {
-      depth += 1;
-      continue;
-    }
-
-    if (character === ")") {
-      depth -= 1;
-      continue;
-    }
-
-    if (depth !== 0) {
-      continue;
-    }
-
-    for (const operator of OPERATORS) {
-      if (fragment.slice(index, index + operator.length) === operator) {
-        return { operator, index };
-      }
-    }
+  for (const ch of text) {
+    if (ch === "(") depth += 1;
+    else if (ch === ")") depth -= 1;
+    if (depth < 0) return false;
   }
-
-  return null;
-}
-
-function findKeywordOutsideGroups(source: string, keyword: string): number {
-  let depth = 0;
-  let inQuote = false;
-  const lowerSource = source.toLowerCase();
-  const lowerKeyword = keyword.toLowerCase();
-
-  for (let index = 0; index <= source.length - keyword.length; index += 1) {
-    const character = source[index];
-
-    if (character === "'") {
-      inQuote = !inQuote;
-    }
-
-    if (!inQuote) {
-      if (character === "(") {
-        depth += 1;
-      } else if (character === ")") {
-        depth -= 1;
-      }
-    }
-
-    if (inQuote || depth !== 0) {
-      continue;
-    }
-
-    if (
-      lowerSource.slice(index, index + keyword.length) === lowerKeyword &&
-      isKeywordBoundary(source[index - 1]) &&
-      isKeywordBoundary(source[index + keyword.length])
-    ) {
-      return index;
-    }
-  }
-
-  return -1;
-}
-
-function startsWithKeyword(source: string, keyword: string): boolean {
-  return source.slice(0, keyword.length).toLowerCase() === keyword.toLowerCase();
-}
-
-function findClosingParenthesis(source: string, startIndex: number): number {
-  let depth = 0;
-
-  for (let index = startIndex; index < source.length; index += 1) {
-    if (source[index] === "(") {
-      depth += 1;
-    } else if (source[index] === ")") {
-      depth -= 1;
-      if (depth === 0) {
-        return index;
-      }
-    }
-  }
-
-  return -1;
+  return depth === 0;
 }
 
 function isColumnToken(value: string): boolean {
@@ -540,10 +381,6 @@ function parseLiteral(value: string): string | number {
   }
 
   throw new Error(`Literal inválido: ${value}`);
-}
-
-function isKeywordBoundary(value: string | undefined): boolean {
-  return value === undefined || /\s|\(|\)|,/.test(value);
 }
 
 function formatLiteral(value: string | number | undefined): string {
