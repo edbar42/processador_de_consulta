@@ -1,234 +1,197 @@
 import { useState } from "react";
 import "./App.css";
-import OperatorGraph from "./components/OperatorGraph";
-import {
-  buildExecutionPlan,
-  type ExecutionStep,
-} from "./helpers/executionPlan";
-import { optimizeAlgebra, summarizeOptimization } from "./helpers/optimizer";
-import {
-  buildOperatorGraph,
-  type OperatorGraphData,
-} from "./helpers/operatorGraph";
-import { parseSqlQuery } from "./helpers/sqlParser";
-import { schemaMetadata } from "./helpers/schemas";
-import { algebraToString, queryToAlgebra } from "./helpers/sqlToAlgebra";
-import validarConsulta from "./helpers/validarConsulta";
+import OperatorGraph from "./components/3_OperatorGraph";
+import { parseSqlQuery } from "./helpers/1_parser";
+import { translate } from "./helpers/2_translator";
+import optimize from "./helpers/4_optmizer";
 import { TestQueries } from "./helpers/testQueries";
+import type { ParsedQuery } from "./helpers/types";
 
-type GraphView = "original" | "optimized";
+export default function App() {
+    const [input, setInput] = useState(TestQueries[0]?.query ?? "");
+    const [submitted, setSubmitted] = useState(input);
+    const [showOptimizedGraph, setShowOptimizedGraph] = useState(false);
 
-interface ProcessResult {
-  rawAlgebra: string;
-  optimizedAlgebra: string;
-  rawGraph: OperatorGraphData;
-  optimizedGraph: OperatorGraphData;
-  executionPlan: ExecutionStep[];
-  optimizationNotes: string[];
-}
+    // Lógica de Processamento
+    const parsed = parseSqlQuery(submitted) as ParsedQuery;
+    const algebraOriginal = parsed.isValid ? translate(parsed) : null;
 
-function App() {
-  const [query, setQuery] = useState("");
-  const [erro, setErro] = useState<string | null>(null);
-  const [result, setResult] = useState<ProcessResult | null>(null);
-  const [graphView, setGraphView] = useState<GraphView>("optimized");
-  const [showTestQueries, setShowTestQueries] = useState(false);
+    const optimized = parsed.isValid ? (optimize(parsed) as ParsedQuery) : null;
+    const algebraOptimized = optimized ? translate(optimized) : null;
 
-  function applyTestQuery(nextQuery: string) {
-    setQuery(nextQuery);
-    setErro(null);
-    setResult(null);
-    setShowTestQueries(false);
-  }
+    // Definição do que exibir no Grafo (Seção 04)
+    const activeGraphQuery =
+        showOptimizedGraph && optimized ? optimized : parsed;
 
-  function handleProcessar() {
-    setErro(null);
-    setResult(null);
-
-    if (!query.trim()) {
-      setErro("Digite uma consulta SQL.");
-      return;
-    }
-
-    const validacao = validarConsulta(query, schemaMetadata);
-    if (!validacao.valid) {
-      setErro(validacao.error ?? "Consulta inválida.");
-      return;
-    }
-
-    try {
-      const parsed = parseSqlQuery(query, schemaMetadata);
-      const rawTree = queryToAlgebra(parsed);
-      const optimizedTree = optimizeAlgebra(rawTree, parsed, schemaMetadata);
-
-      setResult({
-        rawAlgebra: algebraToString(rawTree),
-        optimizedAlgebra: algebraToString(optimizedTree),
-        rawGraph: buildOperatorGraph(rawTree),
-        optimizedGraph: buildOperatorGraph(optimizedTree),
-        executionPlan: buildExecutionPlan(optimizedTree),
-        optimizationNotes: summarizeOptimization(optimizedTree),
-      });
-      setGraphView("optimized");
-    } catch (error) {
-      setErro(
-        error instanceof Error
-          ? error.message
-          : "Erro ao processar a consulta.",
-      );
-    }
-  }
-
-  const activeGraph =
-    graphView === "original" ? result?.rawGraph : result?.optimizedGraph;
-
-  return (
-    <div className="app-shell">
-      <div className="app-container">
-        <header className="hero">
-          <h1>Processador de Consultas</h1>
-        </header>
-
-        <section className="panel input-panel">
-          <label htmlFor="sql-input">Consulta SQL</label>
-          <textarea
-            id="sql-input"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Digite sua query SQL aqui"
-            rows={5}
-          />
-          <div className="input-actions">
-            <div className="test-query-picker">
-              <button
-                type="button"
-                className="secondary-action"
-                onClick={() => setShowTestQueries((current) => !current)}
-                aria-expanded={showTestQueries}
-                aria-haspopup="true"
-              >
-                Queries de Teste
-              </button>
-              {showTestQueries && (
-                <div className="test-query-menu">
-                  {TestQueries.map((item) => (
-                    <button
-                      key={item.label}
-                      type="button"
-                      className="test-query-option"
-                      onClick={() => applyTestQuery(item.query)}
-                    >
-                      <span>{item.label}</span>
-                      <code>{item.query}</code>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <button
-              type="button"
-              className="primary-action"
-              onClick={handleProcessar}
-            >
-              Processar
-            </button>
-          </div>
-        </section>
-
-        {erro && (
-          <section className="panel error-section">
-            <h2>Erro</h2>
-            <p className="error-msg">{erro}</p>
-          </section>
-        )}
-
-        {result && (
-          <>
-            <section className="panel result-section">
-              <h2>Álgebra Relacional Original</h2>
-              <pre className="algebra-expr">{result.rawAlgebra}</pre>
-            </section>
-
-            <section className="panel result-section">
-              <h2>Álgebra Relacional Otimizada</h2>
-              <pre className="algebra-expr">{result.optimizedAlgebra}</pre>
-            </section>
-
-            <section className="panel graph-panel">
-              <div className="section-header">
-                <div>
-                  <h2>Grafo de Operadores</h2>
-                  <p className="section-copy">
-                    Alternar entre a estratégia original e a versão otimizada da
-                    execução.
-                  </p>
-                </div>
-                <div
-                  className="graph-toggle"
-                  role="tablist"
-                  aria-label="Modo do grafo"
-                >
-                  <button
-                    type="button"
-                    className={graphView === "original" ? "is-active" : ""}
-                    onClick={() => setGraphView("original")}
-                  >
-                    Original
-                  </button>
-                  <button
-                    type="button"
-                    className={graphView === "optimized" ? "is-active" : ""}
-                    onClick={() => setGraphView("optimized")}
-                  >
-                    Otimizado
-                  </button>
-                </div>
-              </div>
-
-              {activeGraph && (
-                <OperatorGraph
-                  nodes={activeGraph.nodes}
-                  edges={activeGraph.edges}
-                />
-              )}
-            </section>
-
-            <section className="panel result-section">
-              <h2>Heurísticas Aplicadas</h2>
-              <ul className="notes-list">
-                {result.optimizationNotes.map((note, index) => (
-                  <li key={`${note}-${index}`}>{note}</li>
-                ))}
-              </ul>
-            </section>
-
-            <section className="panel result-section execution-plan">
-              <h2>Plano de Execução</h2>
-              <ol>
-                {result.executionPlan.map((step) => (
-                  <li key={step.resultName}>
-                    <div className="step-topline">
-                      <span className="step-order">#{step.order}</span>
-                      <span className="step-operation">{step.operation}</span>
-                      <span className="step-result">{step.resultName}</span>
+    return (
+        <div className="root">
+            <header className="header">
+                <div className="header-inner">
+                    <div className="badge">SQL</div>
+                    <div>
+                        <h1 className="title">Processador de Consultas</h1>
+                        <p className="subtitle">
+                            Álgebra relacional · Grafo de operadores ·
+                            Otimização
+                        </p>
                     </div>
-                    <p className="step-description">{step.description}</p>
-                    <p className="step-deps">
-                      Dependências:{" "}
-                      {step.dependsOn.length > 0
-                        ? step.dependsOn.join(", ")
-                        : "nenhuma"}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          </>
-        )}
-      </div>
-    </div>
-  );
+                </div>
+            </header>
+
+            <main className="main-content">
+                {/* Bloco 01 — Entrada SQL */}
+                <div
+                    style={{
+                        position: "fixed",
+                        top: "100px",
+                        right: "60px",
+                        zIndex: 10,
+                    }}
+                ></div>
+                <Section label="01" title="Consulta SQL">
+                    <div>
+                        <div className="input-group">
+                            <label className="input-label">
+                                Exemplos Prontos
+                            </label>
+                            <select
+                                className="select-input"
+                                onChange={(e) => {
+                                    setInput(e.target.value);
+                                    setSubmitted(e.target.value);
+                                    setShowOptimizedGraph(false);
+                                }}
+                                value={input}
+                            >
+                                {TestQueries.map((q, i) => (
+                                    <option key={i} value={q.query}>
+                                        {q.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div
+                            className="input-group"
+                            style={{ marginTop: "10px" }}
+                        >
+                            <label>Editor SQL</label>
+                            <textarea
+                                className="text-area"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                rows={4}
+                                spellCheck={false}
+                            />
+                        </div>
+
+                        <button
+                            className="btn-primary"
+                            onClick={() => {
+                                setSubmitted(input);
+                                setShowOptimizedGraph(false);
+                            }}
+                        >
+                            Processar Consulta
+                        </button>
+
+                        {!parsed.isValid && (
+                            <div className="error-box">
+                                <strong>Erro de Sintaxe:</strong> {parsed.error}
+                            </div>
+                        )}
+                    </div>
+                </Section>
+
+                {parsed.isValid && (
+                    <>
+                        {/* Bloco 02 — Álgebra Original */}
+                        <Section label="02" title="Álgebra Relacional">
+                            <div className="algebra-container">
+                                <code className="algebra-code">
+                                    {algebraOriginal}
+                                </code>
+                            </div>
+                        </Section>
+
+                        {/* Bloco 03 — Álgebra Otimizada */}
+                        <Section label="03" title="Álgebra Otimizada">
+                            <div className="algebra-container">
+                                <code className="algebra-code">
+                                    {algebraOptimized}
+                                </code>
+                            </div>
+                        </Section>
+
+                        {/* Bloco 04 — Visualização do Grafo com Switch */}
+                        <Section label="04" title="Grafo de Operadores">
+                            <div
+                                className="switch-row"
+                                style={{ marginBottom: "20px" }}
+                            >
+                                <span
+                                    className={`switch-label ${!showOptimizedGraph ? "active-original" : ""}`}
+                                    onClick={() => setShowOptimizedGraph(false)}
+                                >
+                                    Original
+                                </span>
+
+                                <button
+                                    className="switch-track"
+                                    style={{
+                                        background: showOptimizedGraph
+                                            ? "#10b981"
+                                            : "#94a3b8",
+                                    }}
+                                    onClick={() =>
+                                        setShowOptimizedGraph(
+                                            !showOptimizedGraph,
+                                        )
+                                    }
+                                >
+                                    <span
+                                        className="switch-thumb"
+                                        style={{
+                                            transform: showOptimizedGraph
+                                                ? "translateX(22px)"
+                                                : "translateX(0px)",
+                                        }}
+                                    />
+                                </button>
+
+                                <span
+                                    className={`switch-label ${showOptimizedGraph ? "active-optimized" : ""}`}
+                                    onClick={() => setShowOptimizedGraph(true)}
+                                >
+                                    Otimizado
+                                </span>
+                            </div>
+
+                            <OperatorGraph query={activeGraphQuery} />
+                        </Section>
+                    </>
+                )}
+            </main>
+        </div>
+    );
 }
 
-export default App;
+function Section({
+    label,
+    title,
+    children,
+}: {
+    label: string;
+    title: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <section className="section-card">
+            <div className="section-header">
+                <span className="section-num">{label}</span>
+                <h2 className="section-title">{title}</h2>
+            </div>
+            <div className="section-content">{children}</div>
+        </section>
+    );
+}
