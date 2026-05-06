@@ -1,14 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import "./App.css";
-import OperatorGraph, {
-    type ExecutionStep,
-} from "./components/3_OperatorGraph";
-import { parseSqlQuery } from "./helpers/1_parser";
-import { translate } from "./helpers/2_translator";
-import optimize from "./helpers/4_optmizer";
-import { TestQueries } from "./helpers/testQueries";
+import { parseSqlQuery } from "./1_parser";
+import { buildCanonicalGraph } from "./2_grafo_base";
+import { stringifyGraph } from "./2_translator";
+import { OperatorGraph, type ExecutionStep } from "./3_OperatorGraph";
+import { ExecutionPlanList } from "./5_ExecutionPlan";
 import type { ParsedQuery } from "./helpers/types";
-import { ExecutionPlanList } from "./components/5_ExecutionPlan";
+import optimize from "./4_optmizer";
+import { TestQueries } from "./helpers/testQueries";
 
 export default function App() {
     const [input, setInput] = useState(TestQueries[0]?.query ?? "");
@@ -16,16 +15,32 @@ export default function App() {
     const [showOptimizedGraph, setShowOptimizedGraph] = useState(false);
     const [plan, setPlan] = useState<ExecutionStep[]>([]);
 
-    // Lógica de Processamento
-    const parsed = parseSqlQuery(submitted) as ParsedQuery;
-    const algebraOriginal = parsed.isValid ? translate(parsed) : null;
+    // 1. Parser: SQL -> ParsedQuery
+    const parsed = useMemo(() => parseSqlQuery(submitted) as ParsedQuery, [submitted]);
 
-    const optimized = parsed.isValid ? (optimize(parsed) as ParsedQuery) : null;
-    const algebraOptimized = optimized ? translate(optimized) : null;
+    // 2. Passo 1: Construção do Grafo Canônico
+    const canonicalGraph = useMemo(() => {
+        if (!parsed.isValid) return null;
+        return buildCanonicalGraph(parsed);
+    }, [parsed]);
 
-    // Definição do que exibir no Grafo (Seção 04)
-    const activeGraphQuery =
-        showOptimizedGraph && optimized ? optimized : parsed;
+    // 3. Passos 2 e 3: Aplicação das Heurísticas
+    const optimizedGraph = useMemo(() => {
+        if (!canonicalGraph) return null;
+        return optimize(canonicalGraph);
+    }, [canonicalGraph]);
+
+    // 4. Tradução para Texto (Álgebra)
+    const algebraOriginal = useMemo(() => 
+        canonicalGraph ? stringifyGraph(canonicalGraph) : null
+    , [canonicalGraph]);
+
+    const algebraOptimized = useMemo(() => 
+        optimizedGraph ? stringifyGraph(optimizedGraph) : null
+    , [optimizedGraph]);
+
+    // Determina qual nó o gráfico deve renderizar
+    const activeGraphNode = showOptimizedGraph ? optimizedGraph : canonicalGraph;
 
     return (
         <div className="root">
@@ -34,136 +49,76 @@ export default function App() {
                     <div className="badge">SQL</div>
                     <div>
                         <h1 className="title">Processador de Consultas</h1>
-                        <p className="subtitle">
-                            Álgebra relacional · Grafo de operadores ·
-                            Otimização
-                        </p>
+                        <p className="subtitle">Álgebra Relacional · Heurísticas · Grafos</p>
                     </div>
                 </div>
             </header>
 
             <main className="main-content">
-                {/* Bloco 01 — Entrada SQL */}
-                <div
-                    style={{
-                        position: "fixed",
-                        top: "100px",
-                        right: "60px",
-                        zIndex: 10,
-                    }}
-                ></div>
                 <Section label="01" title="Consulta SQL">
-                    <div>
-                        <div className="input-group">
-                            <label className="input-label">
-                                Exemplos Prontos
-                            </label>
-                            <select
-                                className="select-input"
-                                onChange={(e) => {
-                                    setInput(e.target.value);
-                                    setSubmitted(e.target.value);
-                                    setShowOptimizedGraph(false);
-                                }}
-                                value={input}
-                            >
-                                {TestQueries.map((q, i) => (
-                                    <option key={i} value={q.query}>
-                                        {q.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div
-                            className="input-group"
-                            style={{ marginTop: "10px" }}
-                        >
-                            <label>Editor SQL</label>
-                            <textarea
-                                className="text-area"
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                rows={4}
-                                spellCheck={false}
-                            />
-                        </div>
-
-                        <button
-                            className="btn-primary"
-                            onClick={() => {
-                                setSubmitted(input);
+                    <div className="input-group">
+                        <select
+                            className="select-input"
+                            onChange={(e) => {
+                                setInput(e.target.value);
+                                setSubmitted(e.target.value);
                                 setShowOptimizedGraph(false);
                             }}
+                            value={input}
                         >
-                            Processar Consulta
-                        </button>
-
-                        {!parsed.isValid && (
-                            <div className="error-box">
-                                <strong>Erro de Sintaxe:</strong> {parsed.error}
-                            </div>
-                        )}
+                            {TestQueries.map((q, i) => (
+                                <option key={i} value={q.query}>{q.label}</option>
+                            ))}
+                        </select>
                     </div>
+                    <textarea
+                        className="text-area"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        rows={4}
+                        style={{ marginTop: "10px" }}
+                    />
+                    <button className="btn-primary" onClick={() => setSubmitted(input)}>
+                        Processar e Otimizar
+                    </button>
+                    {!parsed.isValid && (
+                        <div className="error-box"><strong>Erro:</strong> {parsed.error}</div>
+                    )}
                 </Section>
 
                 {parsed.isValid && (
                     <>
-                        {/* Bloco 02 — Álgebra Original */}
                         <Section label="02" title="Álgebra Relacional">
                             <div className="algebra-container">
-                                <code className="algebra-code">
-                                    {algebraOriginal}
-                                </code>
+                                <code className="algebra-code">{algebraOriginal}</code>
                             </div>
                         </Section>
 
-                        {/* Bloco 03 — Álgebra Otimizada */}
                         <Section label="03" title="Álgebra Otimizada">
-                            <div className="algebra-container">
-                                <code className="algebra-code">
-                                    {algebraOptimized}
-                                </code>
+                            <div className="algebra-container" style={{ borderColor: "#10b981" }}>
+                                <code className="algebra-code">{algebraOptimized}</code>
                             </div>
                         </Section>
 
-                        {/* Bloco 04 — Visualização do Grafo com Switch */}
                         <Section label="04" title="Grafo de Operadores">
-                            <div
-                                className="switch-row"
-                                style={{ marginBottom: "20px" }}
-                            >
-                                <span
+                            <div className="switch-row" style={{ marginBottom: "20px" }}>
+                                <span 
                                     className={`switch-label ${!showOptimizedGraph ? "active-original" : ""}`}
                                     onClick={() => setShowOptimizedGraph(false)}
                                 >
                                     Original
                                 </span>
-
                                 <button
                                     className="switch-track"
-                                    style={{
-                                        background: showOptimizedGraph
-                                            ? "#10b981"
-                                            : "#94a3b8",
-                                    }}
-                                    onClick={() =>
-                                        setShowOptimizedGraph(
-                                            !showOptimizedGraph,
-                                        )
-                                    }
+                                    style={{ background: showOptimizedGraph ? "#10b981" : "#94a3b8" }}
+                                    onClick={() => setShowOptimizedGraph(!showOptimizedGraph)}
                                 >
-                                    <span
-                                        className="switch-thumb"
-                                        style={{
-                                            transform: showOptimizedGraph
-                                                ? "translateX(22px)"
-                                                : "translateX(0px)",
-                                        }}
+                                    <span 
+                                        className="switch-thumb" 
+                                        style={{ transform: showOptimizedGraph ? "translateX(22px)" : "translateX(0px)" }}
                                     />
                                 </button>
-
-                                <span
+                                <span 
                                     className={`switch-label ${showOptimizedGraph ? "active-optimized" : ""}`}
                                     onClick={() => setShowOptimizedGraph(true)}
                                 >
@@ -171,9 +126,9 @@ export default function App() {
                                 </span>
                             </div>
 
-                            <OperatorGraph
-                                query={activeGraphQuery}
-                                onPlanGenerated={(p) => setPlan(p)}
+                            <OperatorGraph 
+                                rootNode={activeGraphNode} 
+                                onPlanGenerated={(p) => setPlan(p)} 
                             />
                             <ExecutionPlanList steps={plan} />
                         </Section>
@@ -184,15 +139,7 @@ export default function App() {
     );
 }
 
-function Section({
-    label,
-    title,
-    children,
-}: {
-    label: string;
-    title: string;
-    children: React.ReactNode;
-}) {
+function Section({ label, title, children }: { label: string; title: string; children: React.ReactNode }) {
     return (
         <section className="section-card">
             <div className="section-header">
