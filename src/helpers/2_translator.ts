@@ -6,17 +6,17 @@ export function translate(query: ParsedQuery): string {
     let relation = query.from;
 
     query.joins.forEach((join) => {
-        relation = `(${relation} ⋈_{${join.on}} ${join.table})`;
+        relation = `(${relation} |x|_${join.on} ${join.table})`;
     });
 
     if (query.wheres && query.wheres.length > 0) {
         const conds = query.wheres
             .map((w) => `${w.left} ${w.operator} ${w.right}`)
             .join(" ∧ ");
-        relation = `σ_{${conds}}(${relation})`;
+        relation = `σ_${conds}(${relation})`;
     }
 
     const attrs = query.select.join(", ");
 
-    return `π_{${attrs}}(${relation})`;
+    return `π_${attrs}(${relation})`;
 }

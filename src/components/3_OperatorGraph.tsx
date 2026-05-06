@@ -1,11 +1,20 @@
 import type { Edge, Node } from "@xyflow/react";
 import { Background, Controls, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import type { ParsedQuery } from "../helpers/types";
+
+// Estrutura do Passo de Execução
+export interface ExecutionStep {
+    id: string;
+    type: "TABLE" | "SELECTION" | "PROJECTION" | "JOIN";
+    label: string;
+    levelY: number;
+}
 
 interface Props {
     query: ParsedQuery;
+    onPlanGenerated?: (plan: ExecutionStep[]) => void; // Callback para retornar o plano
 }
 
 const NODE_WIDTH = 240;
@@ -13,8 +22,18 @@ const NODE_HEIGHT = 60;
 const H_GAP = 80;
 const V_GAP = 50;
 
-export function OperatorGraph({ query }: Props) {
-    const { nodes, edges } = useMemo(() => buildGraph(query), [query]);
+export function OperatorGraph({ query, onPlanGenerated }: Props) {
+    const { nodes, edges, executionPlan } = useMemo(
+        () => buildGraph(query),
+        [query],
+    );
+
+    // Dispara o callback sempre que o plano for recalculado
+    useEffect(() => {
+        if (onPlanGenerated && query.isValid) {
+            onPlanGenerated(executionPlan);
+        }
+    }, [executionPlan, onPlanGenerated, query.isValid]);
 
     if (!query.isValid) {
         return (
@@ -43,25 +62,23 @@ export function OperatorGraph({ query }: Props) {
                 <Background color="#f8f9fa" gap={20} />
                 <Controls showInteractive={false} position="bottom-right" />
             </ReactFlow>
-
             <style>{styles}</style>
         </div>
     );
 }
 
-function buildGraph(query: ParsedQuery): { nodes: Node[]; edges: Edge[] } {
+function buildGraph(query: ParsedQuery): {
+    nodes: Node[];
+    edges: Edge[];
+    executionPlan: ExecutionStep[];
+} {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     let idCounter = 0;
     const nextId = () => `n${idCounter++}`;
 
-    // Passo vertical constante: altura do nó + o gap de 50px
     const VERTICAL_STEP = NODE_HEIGHT + V_GAP;
-
     const tables = [query.from, ...query.joins.map((j) => j.table)];
-
-    // Calculamos o tableY para ser o ponto mais baixo.
-    // Estimamos 3 níveis por folha + níveis de join + topo.
     const tableY = (query.joins.length + 6) * VERTICAL_STEP;
 
     const tableIds: string[] = [];
@@ -69,21 +86,14 @@ function buildGraph(query: ParsedQuery): { nodes: Node[]; edges: Edge[] } {
         tables.length * NODE_WIDTH + (tables.length - 1) * H_GAP;
     const tableStartX = -(totalTablesWidth / 2) + NODE_WIDTH / 2;
 
-    // 1. Renderização das Folhas (Tabelas e seus operadores locais)
+    // 1. Construção das Folhas (Tabelas e seus operadores locais)
     tables.forEach((tableExpr, i) => {
         const xPos = tableStartX + i * (NODE_WIDTH + H_GAP);
-
-        const hasProjection = tableExpr.includes("π");
-        const hasSelection = tableExpr.includes("σ");
-
         const tableName =
             tableExpr.match(/([A-Za-z0-9_]+)\s*\)*$/)?.[1] || tableExpr;
-        const selectionMatch = tableExpr.match(/σ\s*([^(]+)/)?.[1];
-        const projectionMatch = tableExpr.match(/π\s*([^(]+)/)?.[1];
-
         let currentY = tableY;
 
-        // NÍVEL: TABELA
+        // Nível: TABELA
         const tableId = nextId();
         nodes.push({
             id: tableId,
@@ -93,39 +103,39 @@ function buildGraph(query: ParsedQuery): { nodes: Node[]; edges: Edge[] } {
         });
         let lastNodeId = tableId;
 
-        // NÍVEL: SELEÇÃO (σ) -> Sobe exatamente 1 STEP
-        if (hasSelection) {
+        // Nível: SELEÇÃO LOCAL (σ)
+        if (tableExpr.includes("σ")) {
             currentY -= VERTICAL_STEP;
             const sigmaId = nextId();
+            const label = `σ ${tableExpr.match(/σ\s*([^(]+)/)?.[1]?.trim()}`;
             nodes.push({
                 id: sigmaId,
                 position: { x: xPos, y: currentY },
-                data: { label: `σ ${selectionMatch?.trim()}` },
+                data: { label },
                 className: "node-selection",
             });
             edges.push(makeEdge(sigmaId, lastNodeId));
             lastNodeId = sigmaId;
         }
 
-        // NÍVEL: PROJEÇÃO (π) -> Sobe exatamente 1 STEP
-        if (hasProjection) {
+        // Nível: PROJEÇÃO LOCAL (π)
+        if (tableExpr.includes("π")) {
             currentY -= VERTICAL_STEP;
             const piId = nextId();
+            const label = `π ${tableExpr.match(/π\s*([^(]+)/)?.[1]?.trim()}`;
             nodes.push({
                 id: piId,
                 position: { x: xPos, y: currentY },
-                data: { label: `π ${projectionMatch?.trim()}` },
+                data: { label },
                 className: "node-projection",
             });
             edges.push(makeEdge(piId, lastNodeId));
             lastNodeId = piId;
         }
-
         tableIds.push(lastNodeId);
     });
 
-    // 2. Renderização dos JOINs
-    // Começamos os joins acima do nível máximo que as folhas podem atingir
+    // 2. Construção dos JOINs
     let prevId = tableIds[0];
     let joinY = tableY - 3 * VERTICAL_STEP;
 
@@ -134,8 +144,6 @@ function buildGraph(query: ParsedQuery): { nodes: Node[]; edges: Edge[] } {
         const join = query.joins[i];
         const leftNode = nodes.find((n) => n.id === prevId)!;
         const rightNode = nodes.find((n) => n.id === tableIds[i + 1])!;
-
-        // Centraliza o Join entre os dois nós que ele une
         const cx = (leftNode.position.x + rightNode.position.x) / 2;
 
         nodes.push({
@@ -145,20 +153,20 @@ function buildGraph(query: ParsedQuery): { nodes: Node[]; edges: Edge[] } {
             className: "node-join",
         });
 
+        // O Join aponta para os seus dois ramos (filhos)
         edges.push(makeEdge(joinId, prevId));
         edges.push(makeEdge(joinId, tableIds[i + 1]));
 
         prevId = joinId;
-        joinY -= VERTICAL_STEP; // Sobe exatamente 1 STEP
+        joinY -= VERTICAL_STEP;
     }
 
-    // 3. Filtros Globais (Sigma final, se houver)
+    // 3. Filtros Globais
     if (query.wheres && query.wheres.length > 0) {
         const globalSigmaId = nextId();
         const conds = query.wheres
             .map((w) => `${w.left}${w.operator}${w.right}`)
             .join(" ∧ ");
-
         nodes.push({
             id: globalSigmaId,
             position: {
@@ -168,7 +176,6 @@ function buildGraph(query: ParsedQuery): { nodes: Node[]; edges: Edge[] } {
             data: { label: `σ ${conds}` },
             className: "node-selection",
         });
-
         edges.push(makeEdge(globalSigmaId, prevId));
         prevId = globalSigmaId;
         joinY -= VERTICAL_STEP;
@@ -185,120 +192,70 @@ function buildGraph(query: ParsedQuery): { nodes: Node[]; edges: Edge[] } {
         data: { label: `π ${query.select.join(", ")}` },
         className: "node-projection",
     });
-
     edges.push(makeEdge(rootProjId, prevId));
 
-    return { nodes, edges };
+    // --- GERAÇÃO DO PLANO DE EXECUÇÃO (PÓS-ORDEM) ---
+    const executionPlan: ExecutionStep[] = [];
+    const visited = new Set<string>();
+
+    const traverse = (nodeId: string) => {
+        if (visited.has(nodeId)) return;
+
+        // Encontra todos os "filhos" (nós de onde saem arestas PARA este nó)
+        // No nosso modelo de dados, o target é o filho e o source é o pai
+        const childEdges = edges.filter((e) => e.source === nodeId);
+
+        // Visita os ramos primeiro (Esquerda e depois Direita, se houver)
+        childEdges.forEach((edge) => traverse(edge.target));
+
+        // Processa o nó atual (Pós-ordem)
+        const node = nodes.find((n) => n.id === nodeId);
+        if (node) {
+            const typeMatch = node.className?.match(/node-([a-z]+)/);
+            const type = (
+                typeMatch ? typeMatch[1].toUpperCase() : "OPERATOR"
+            ) as any;
+
+            executionPlan.push({
+                id: node.id,
+                type: type,
+                label: node.data.label as string,
+                levelY: node.position.y,
+            });
+        }
+        visited.add(nodeId);
+    };
+
+    // Inicia a travessia a partir da Raiz (o último nó criado)
+    traverse(rootProjId);
+
+    return { nodes, edges, executionPlan };
 }
+
 function makeEdge(source: string, target: string): Edge {
     return {
         id: `${source}-${target}`,
         source,
         target,
-        animated: true, // Agora todas as conexões terão a animação de fluxo
+        animated: true,
         className: "custom-edge",
         markerEnd: {
             type: "arrowclosed" as any,
-            color: "#cbd5e1", // Cor combinando com a linha
+            color: "#cbd5e1",
             width: 20,
             height: 20,
         },
     };
 }
 
-// --- ESTILOS CSS ---
 const styles = `
-  .graph-wrapper {
-    width: 100%;
-    height: 600px;
-    background: #f8fafc;
-    border-radius: 16px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-    border: 1px solid #d2d2d2;
-    overflow: hidden;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  }
-
-  .error-container {
-    padding: 24px;
-    background: #f91515;
-    border: 1px solid #feb2b2;
-    border-radius: 12px;
-    color: #c53030;
-    font-weight: 500;
-    margin-top: 20px;
-  }
-
-  /* Estilos Base dos Nós */
-  .react-flow__node {
-    border-radius: 12px !important;
-    padding: 12px 20px !important;
-    font-weight: 600 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-    border: none !important;
-    transition: transform 0.1s ease, box-shadow 0.2s ease !important;
-  }
-
-  .react-flow__node:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
-  }
-
-  /* Projeção (Pi) - Azul/Roxo */
-  .node-projection {
-    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
-    color: white !important;
-    width: ${NODE_WIDTH}px;
-    min-height: ${NODE_HEIGHT}px;
-  }
-
-  /* Seleção (Sigma) - Verde */
-  .node-selection {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-    color: white !important;
-    width: ${NODE_WIDTH}px;
-  }
-
-  /* Join (Bowtie) - Laranja/Coral */
-  .node-join {
-    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%) !important;
-    color: white !important;
-    font-size: 12px !important;
-    width: ${NODE_WIDTH}px;
-  }
-
-  /* Tabela - Dark/Gray */
-  .node-table {
-    background: #334155 !important;
-    color: #f8fafc !important;
-    letter-spacing: 0.5px;
-    width: ${NODE_WIDTH}px;
-  }
-
-  /* Customização das Arestas */
-  .custom-edge {
-    stroke: #cbd5e1 !important;
-    stroke-width: 2.5 !important;
-    /* Controla a velocidade e o estilo do tracejado animado */
-    stroke-dasharray: 5; 
-   }
-
-  .react-flow__edge-path {
-    transition: stroke-width 0.2s;
-  }
-
-  .react-flow__controls {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
-    border: none !important;
-  }
-
-  .react-flow__controls-button {
-    background: white !important;
-    border-bottom: 1px solid #eee !important;
-  }
+  .graph-wrapper { width: 100%; height: 600px; background: #f8fafc; border-radius: 16px; border: 1px solid #d2d2d2; overflow: hidden; }
+  .error-container { padding: 24px; color: #c53030; font-weight: 500; }
+  .node-projection { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important; color: white !important; width: ${NODE_WIDTH}px; }
+  .node-selection { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; color: white !important; width: ${NODE_WIDTH}px; }
+  .node-join { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%) !important; color: white !important; width: ${NODE_WIDTH}px; }
+  .node-table { background: #334155 !important; color: #f8fafc !important; width: ${NODE_WIDTH}px; }
+  .custom-edge { stroke: #cbd5e1 !important; stroke-width: 2.5 !important; stroke-dasharray: 5; }
 `;
 
 export default OperatorGraph;

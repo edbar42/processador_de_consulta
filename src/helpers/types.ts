@@ -17,3 +17,11 @@ export interface WhereCondition {
     operator: string;
     right: string;
 }
+
+// export interface ExecutionStep {
+//     id: string;
+//     level: number; // Para identificar a profundidade
+//     type: "TABLE" | "SELECTION" | "PROJECTION" | "JOIN";
+//     label: string;
+//     description: string;
+// }

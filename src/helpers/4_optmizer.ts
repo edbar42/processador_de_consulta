@@ -53,13 +53,13 @@ export default function optimize(query: ParsedQuery): ParsedQuery {
         // Passo A: Seleção (σ) - Agora sem subscrito
         const filters = filtersByTable.get(tableName);
         if (filters && filters.length > 0) {
-            expression = `σ ${filters.join(" ^ ")}(${expression})`;
+            expression = `σ_${filters.join(" ∧ ")}(${expression})`;
         }
 
         // Passo B: Projeção (π) - Agora sem subscrito e envolvendo a seleção
         const cols = columnsByTable.get(tableName);
         if (cols && cols.size > 0) {
-            expression = `π ${Array.from(cols).join(", ")}(${expression})`;
+            expression = `π_${Array.from(cols).join(", ")}(${expression})`;
         }
 
         return expression;

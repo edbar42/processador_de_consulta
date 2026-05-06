@@ -1,16 +1,20 @@
 import { useState } from "react";
 import "./App.css";
-import OperatorGraph from "./components/3_OperatorGraph";
+import OperatorGraph, {
+    type ExecutionStep,
+} from "./components/3_OperatorGraph";
 import { parseSqlQuery } from "./helpers/1_parser";
 import { translate } from "./helpers/2_translator";
 import optimize from "./helpers/4_optmizer";
 import { TestQueries } from "./helpers/testQueries";
 import type { ParsedQuery } from "./helpers/types";
+import { ExecutionPlanList } from "./components/5_ExecutionPlan";
 
 export default function App() {
     const [input, setInput] = useState(TestQueries[0]?.query ?? "");
     const [submitted, setSubmitted] = useState(input);
     const [showOptimizedGraph, setShowOptimizedGraph] = useState(false);
+    const [plan, setPlan] = useState<ExecutionStep[]>([]);
 
     // Lógica de Processamento
     const parsed = parseSqlQuery(submitted) as ParsedQuery;
@@ -167,7 +171,11 @@ export default function App() {
                                 </span>
                             </div>
 
-                            <OperatorGraph query={activeGraphQuery} />
+                            <OperatorGraph
+                                query={activeGraphQuery}
+                                onPlanGenerated={(p) => setPlan(p)}
+                            />
+                            <ExecutionPlanList steps={plan} />
                         </Section>
                     </>
                 )}

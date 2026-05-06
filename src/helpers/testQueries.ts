@@ -21,7 +21,15 @@ export const TestQueries: query[] = [
         query: "SELECT Cliente.Nome, Endereco.Cidade, Endereco.UF FROM Cliente JOIN Endereco ON Cliente.idCliente = Endereco.Cliente_idCliente WHERE Endereco.UF = 'CE'",
     },
     {
-        label: "slide",
-        query: `Select Tb1.Nome, tb3.sal From Tb1 Join Tb2 on tb1.pk = tb2.fk Join tb3 on tb2.pk = tb3.fk Where tb1.id > 300 and tb3.sal <> 0`,
+        label: "exemplo slide aula",
+        query: `Select Tb1.Nome, tb3.sal\nFrom Tb1\nJoin Tb2 on tb1.pk = tb2.fk Join tb3 on tb2.pk = tb3.fk\nWHERE tb1.id > 300 and tb3.sal <> 0`,
+    },
+    {
+        label: "exemplo prof 1",
+        query: `SELECT cliente.nome, pedido.idPedido, pedido.DataPedido, pedido.ValorTotalPedido \nFROM Cliente\nJOIN pedido ON cliente.idcliente = pedido.Cliente_idCliente\nWHERE cliente.TipoCliente_idTipoCliente = 1 and pedido.ValorTotalPedido = 0;`,
+    },
+    {
+        label: "exemplo prof 2",
+        query: `SELECT Tb1.Nome, tb3.sal\nFROM Tb1\nJOIN Tb2 on tb1.pk = tb2.fk\nJOIN tb3 on tb2.pk = tb3.fk\nWHERE tb1.id > 300 AND tb3.sal <> 0`,
     },
 ];
