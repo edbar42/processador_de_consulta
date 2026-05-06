@@ -23,7 +23,9 @@ export function ExecutionPlanList({ steps }: Props) {
                 {bottomUpSteps.map((step, index) => (
                     <div key={step.id} className="timeline-item">
                         <div className="timeline-badge-container">
-                            <div className={`timeline-badge badge-${step.type.toLowerCase()}`}>
+                            <div
+                                className={`timeline-badge badge-${step.type.toLowerCase()}`}
+                            >
                                 {index + 1}
                             </div>
                             {index !== bottomUpSteps.length - 1 && (
@@ -33,16 +35,15 @@ export function ExecutionPlanList({ steps }: Props) {
 
                         <div className="step-card">
                             <div className="step-header">
-                                <span className={`step-type type-${step.type.toLowerCase()}`}>
+                                <span
+                                    className={`step-type type-${step.type.toLowerCase()}`}
+                                >
                                     {step.type}
                                 </span>
                                 <span className="step-id">ID: {step.id}</span>
                             </div>
                             <div className="step-body">
                                 <code className="step-label">{step.label}</code>
-                                <p className="step-description">
-                                    {getStepDescription(step)}
-                                </p>
                             </div>
                         </div>
                     </div>
