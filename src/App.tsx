@@ -8,6 +8,7 @@ import { ExecutionPlanList } from "./5_ExecutionPlan";
 import type { ParsedQuery } from "./helpers/types";
 import optimize from "./4_optmizer";
 import { TestQueries } from "./helpers/testQueries";
+import formatSQLQuery from "./helpers/queryStringFormatter";
 
 export default function App() {
     const [input, setInput] = useState(TestQueries[0]?.query ?? "");
@@ -15,32 +16,23 @@ export default function App() {
     const [showOptimizedGraph, setShowOptimizedGraph] = useState(false);
     const [plan, setPlan] = useState<ExecutionStep[]>([]);
 
-    // 1. Parser: SQL -> ParsedQuery
-    const parsed = useMemo(() => parseSqlQuery(submitted) as ParsedQuery, [submitted]);
+    // 1. Valida e faz parser: SQL -> ParsedQuery
+    const parsed = parseSqlQuery(submitted) as ParsedQuery;
 
-    // 2. Passo 1: Construção do Grafo Canônico
-    const canonicalGraph = useMemo(() => {
-        if (!parsed.isValid) return null;
-        return buildCanonicalGraph(parsed);
-    }, [parsed]);
+    // 2. Construção do Grafo Canônico
+    const canonicalGraph = buildCanonicalGraph(parsed) || null;
 
-    // 3. Passos 2 e 3: Aplicação das Heurísticas
-    const optimizedGraph = useMemo(() => {
-        if (!canonicalGraph) return null;
-        return optimize(canonicalGraph);
-    }, [canonicalGraph]);
+    // 3. Aplicação das Heurísticas
+    const optimizedGraph = optimize(canonicalGraph);
 
     // 4. Tradução para Texto (Álgebra)
-    const algebraOriginal = useMemo(() => 
-        canonicalGraph ? stringifyGraph(canonicalGraph) : null
-    , [canonicalGraph]);
-
-    const algebraOptimized = useMemo(() => 
-        optimizedGraph ? stringifyGraph(optimizedGraph) : null
-    , [optimizedGraph]);
+    const algebraOriginal = stringifyGraph(canonicalGraph);
+    const algebraOptimized = stringifyGraph(optimizedGraph);
 
     // Determina qual nó o gráfico deve renderizar
-    const activeGraphNode = showOptimizedGraph ? optimizedGraph : canonicalGraph;
+    const activeGraphNode = showOptimizedGraph
+        ? optimizedGraph
+        : canonicalGraph;
 
     return (
         <div className="root">
@@ -49,7 +41,9 @@ export default function App() {
                     <div className="badge">SQL</div>
                     <div>
                         <h1 className="title">Processador de Consultas</h1>
-                        <p className="subtitle">Álgebra Relacional · Heurísticas · Grafos</p>
+                        <p className="subtitle">
+                            Álgebra Relacional · Heurísticas · Grafos
+                        </p>
                     </div>
                 </div>
             </header>
@@ -67,22 +61,29 @@ export default function App() {
                             value={input}
                         >
                             {TestQueries.map((q, i) => (
-                                <option key={i} value={q.query}>{q.label}</option>
+                                <option key={i} value={q.query}>
+                                    {q.label}
+                                </option>
                             ))}
                         </select>
                     </div>
                     <textarea
                         className="text-area"
-                        value={input}
+                        value={formatSQLQuery(input)}
                         onChange={(e) => setInput(e.target.value)}
-                        rows={4}
+                        rows={7}
                         style={{ marginTop: "10px" }}
                     />
-                    <button className="btn-primary" onClick={() => setSubmitted(input)}>
+                    <button
+                        className="btn-primary"
+                        onClick={() => setSubmitted(input)}
+                    >
                         Processar e Otimizar
                     </button>
                     {!parsed.isValid && (
-                        <div className="error-box"><strong>Erro:</strong> {parsed.error}</div>
+                        <div className="error-box">
+                            <strong>Erro:</strong> {parsed.error}
+                        </div>
                     )}
                 </Section>
 
@@ -90,19 +91,26 @@ export default function App() {
                     <>
                         <Section label="02" title="Álgebra Relacional">
                             <div className="algebra-container">
-                                <code className="algebra-code">{algebraOriginal}</code>
+                                <code className="algebra-code">
+                                    {algebraOriginal}
+                                </code>
                             </div>
                         </Section>
 
                         <Section label="03" title="Álgebra Otimizada">
-                            <div className="algebra-container" style={{ borderColor: "#10b981" }}>
-                                <code className="algebra-code">{algebraOptimized}</code>
+                            <div className="algebra-container">
+                                <code className="algebra-code">
+                                    {algebraOptimized}
+                                </code>
                             </div>
                         </Section>
 
                         <Section label="04" title="Grafo de Operadores">
-                            <div className="switch-row" style={{ marginBottom: "20px" }}>
-                                <span 
+                            <div
+                                className="switch-row"
+                                style={{ marginBottom: "20px" }}
+                            >
+                                <span
                                     className={`switch-label ${!showOptimizedGraph ? "active-original" : ""}`}
                                     onClick={() => setShowOptimizedGraph(false)}
                                 >
@@ -110,15 +118,27 @@ export default function App() {
                                 </span>
                                 <button
                                     className="switch-track"
-                                    style={{ background: showOptimizedGraph ? "#10b981" : "#94a3b8" }}
-                                    onClick={() => setShowOptimizedGraph(!showOptimizedGraph)}
+                                    style={{
+                                        background: showOptimizedGraph
+                                            ? "#10b981"
+                                            : "#94a3b8",
+                                    }}
+                                    onClick={() =>
+                                        setShowOptimizedGraph(
+                                            !showOptimizedGraph,
+                                        )
+                                    }
                                 >
-                                    <span 
-                                        className="switch-thumb" 
-                                        style={{ transform: showOptimizedGraph ? "translateX(22px)" : "translateX(0px)" }}
+                                    <span
+                                        className="switch-thumb"
+                                        style={{
+                                            transform: showOptimizedGraph
+                                                ? "translateX(22px)"
+                                                : "translateX(0px)",
+                                        }}
                                     />
                                 </button>
-                                <span 
+                                <span
                                     className={`switch-label ${showOptimizedGraph ? "active-optimized" : ""}`}
                                     onClick={() => setShowOptimizedGraph(true)}
                                 >
@@ -126,9 +146,9 @@ export default function App() {
                                 </span>
                             </div>
 
-                            <OperatorGraph 
-                                rootNode={activeGraphNode} 
-                                onPlanGenerated={(p) => setPlan(p)} 
+                            <OperatorGraph
+                                rootNode={activeGraphNode}
+                                onPlanGenerated={(p) => setPlan(p)}
                             />
                             <ExecutionPlanList steps={plan} />
                         </Section>
@@ -139,7 +159,15 @@ export default function App() {
     );
 }
 
-function Section({ label, title, children }: { label: string; title: string; children: React.ReactNode }) {
+function Section({
+    label,
+    title,
+    children,
+}: {
+    label: string;
+    title: string;
+    children: React.ReactNode;
+}) {
     return (
         <section className="section-card">
             <div className="section-header">
