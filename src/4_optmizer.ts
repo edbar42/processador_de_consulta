@@ -1,6 +1,12 @@
 import type { QueryNode } from "./helpers/types";
 
 export default function optimize(root: QueryNode): QueryNode {
+    console.log(
+        "\x1b[33m%s\x1b[0m",
+        `
+        4_optimize
+        `,
+    );
     // Primeiro descemos as seleções
     let optimized = pushdownSelections(root);
 
@@ -32,7 +38,9 @@ function pushdownSelections(node: QueryNode): QueryNode {
     return node;
 }
 
-// Ajuste para o Passo 3: Envolve o Sigma com um Pi
+// Redução de Campos
+// Aplica a projeção o mais cedo possível, cercando tabelas e seleções
+// para garantir que apenas colunas essenciais participem dos JOINS e
 function pushdownProjections(
     node: QueryNode,
     requiredCols: string[],
@@ -54,13 +62,10 @@ function pushdownProjections(
         };
     }
 
-    // Se encontrar um SELECTION ou uma TABLE, é hora de aplicar o Pi "do professor"
     if (node.type === "SELECTION" || node.type === "TABLE") {
         const tableName = getTableName(node);
         if (!tableName) return node;
 
-        // O segredo do professor: ele projeta apenas o que é exigido pela SAÍDA ou JOIN
-        // Ele ignora a coluna usada no Sigma (como o 'id') na projeção final do ramo
         const myCols = requiredCols
             .filter((c) =>
                 c.toLowerCase().startsWith(tableName.toLowerCase() + "."),

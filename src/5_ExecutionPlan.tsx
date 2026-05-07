@@ -13,8 +13,7 @@ export function ExecutionPlanList({ steps }: Props) {
         );
     }
 
-    // Inverte a lista para que o Passo 1 seja a base da árvore (TABLE)
-    const bottomUpSteps = [...steps].reverse();
+    const bottomUpSteps = [...steps];
 
     return (
         <div className="plan-container">

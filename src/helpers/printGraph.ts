@@ -1,5 +1,7 @@
 export default function printGraph(node: any, indent: string = "") {
-    if (!node) return;
+    if (!node) {
+        return;
+    }
 
     // Formata o label de acordo com o tipo de nó
     let label = "";

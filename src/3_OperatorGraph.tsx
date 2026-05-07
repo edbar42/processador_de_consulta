@@ -50,6 +50,11 @@ export function OperatorGraph({ rootNode, onPlanGenerated }: Props) {
                 fitViewOptions={{ padding: 0.2 }}
                 nodesDraggable={true}
                 nodesConnectable={false}
+                zoomOnScroll={false}
+                zoomOnPinch={true}
+                panOnScroll={false}
+                selectionKeyCode="Control"
+                zoomActivationKeyCode="Control"
             >
                 <Background color="#f8f9fa" gap={20} />
                 <Controls showInteractive={false} position="bottom-right" />
@@ -60,6 +65,13 @@ export function OperatorGraph({ rootNode, onPlanGenerated }: Props) {
 }
 
 function buildGraph(root: QueryNode) {
+    console.log(
+        "\x1b[33m%s\x1b[0m",
+        `
+        3_OperatorGraph.traverse()
+        `,
+    );
+
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     const executionPlan: ExecutionStep[] = [];
@@ -70,6 +82,8 @@ function buildGraph(root: QueryNode) {
         const id = `n${idCounter++}`;
         const label = getLabel(node);
         const className = `node-${node.type.toLowerCase()}`;
+
+        console.log(label, node.type);
 
         if (node.type === "JOIN") {
             const leftWidth = calculateSubtreeWidth(node.left);
@@ -160,7 +174,7 @@ function makeEdge(source: string, target: string): Edge {
 }
 
 const styles = `
-  .graph-wrapper { width: 100%; height: 790px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
+  .graph-wrapper { width: 100%; height: 590px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
   .node-projection { background: #6366f1 !important; color: white !important; border-radius: 8px; font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center; width: ${NODE_WIDTH}px; height: ${NODE_HEIGHT}px; }
   .node-selection { background: #10b981 !important; color: white !important; border-radius: 8px; font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center; width: ${NODE_WIDTH}px; height: ${NODE_HEIGHT}px; }
   .node-join { background: #f97316 !important; color: white !important; border-radius: 8px; font-size: 11px; font-weight: 500; display: flex; align-items: center; justify-content: center; width: ${NODE_WIDTH}px; height: ${NODE_HEIGHT}px; }

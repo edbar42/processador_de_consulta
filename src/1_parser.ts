@@ -4,6 +4,13 @@ import type { JoinInfo, ParsedQuery, WhereCondition } from "./helpers/types";
 // PRINCIPAL  ===================================================================
 
 export function parseSqlQuery(input: string) {
+    console.log(
+        "\x1b[33m%s\x1b[0m",
+        `
+        1_parser
+        `,
+    );
+
     const normalized = input.trim().toLowerCase().replace(/\s+/g, " ");
     const sqlRegex = /^select\s+(.+?)\s+from\s+(.+?)(?:\s+where\s+(.*))?$/i;
     const match = normalized.match(sqlRegex);
@@ -16,9 +23,7 @@ export function parseSqlQuery(input: string) {
 
     const [, rawSelect, rawTables, rawWhere] = match;
 
-    console.log(`1 ${rawSelect}`);
-    console.log(`2 ${rawTables}`);
-    console.log(`3 ${rawWhere}`);
+    console.log("=> PRE-PARSER\n", { rawSelect, rawTables, rawWhere });
 
     try {
         const select = rawSelect.split(",").map((c) => c.trim());
@@ -29,6 +34,13 @@ export function parseSqlQuery(input: string) {
         validateActiveTables(activeTables);
         validateSelect(select, activeTables);
         validateWheres(wheres, activeTables);
+
+        console.log("=> POS-PARSER\n", {
+            select,
+            mainTable,
+            activeTables,
+            wheres,
+        });
 
         return {
             select,

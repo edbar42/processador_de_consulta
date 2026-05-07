@@ -1,16 +1,20 @@
-import printGraph from "./helpers/teste";
+import printGraph from "./helpers/printGraph";
 import type { ParsedQuery, QueryNode } from "./helpers/types";
 
 export function buildCanonicalGraph(query: ParsedQuery): QueryNode {
+    console.log(
+        "\x1b[33m%s\x1b[0m",
+        `
+        2_grafo_base
+        `,
+    );
     // 1 - Começando com o FROM. Ele é a base da tabela
     let root: QueryNode = {
         type: "TABLE",
         params: { name: query.from },
     };
 
-    console.log("\n\n\n\n\n\nNOVO GRAFO!!!!!!\n\n\n\n\n\n");
-
-    console.log("\n\n-------- FROM \n\n");
+    console.log("\n↓ FROM \n\n");
     printGraph(root);
 
     // 2 - Os JOIN
@@ -26,7 +30,7 @@ export function buildCanonicalGraph(query: ParsedQuery): QueryNode {
         };
     });
 
-    console.log("\n\n-------- JOINs \n\n");
+    console.log("\n↓ JOIN \n\n");
     printGraph(root);
 
     // 3 - Os WHERE
@@ -43,7 +47,7 @@ export function buildCanonicalGraph(query: ParsedQuery): QueryNode {
         };
     }
 
-    console.log("\n\n-------- WHEREs \n\n");
+    console.log("\n↓ WHERE \n\n");
     printGraph(root);
 
     // 4 - O SELECT
@@ -53,7 +57,7 @@ export function buildCanonicalGraph(query: ParsedQuery): QueryNode {
         child: root,
     };
 
-    console.log("\n\n-------- SELECT \n\n");
+    console.log("\n↓ SELECT \n\n");
     printGraph(root);
 
     return root;
