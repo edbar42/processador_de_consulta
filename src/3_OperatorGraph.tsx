@@ -24,7 +24,7 @@ const V_GAP = 60; // Espaço vertical entre níveis
 export function OperatorGraph({ rootNode, onPlanGenerated }: Props) {
     const { nodes, edges, executionPlan } = useMemo(() => {
         if (!rootNode) return { nodes: [], edges: [], executionPlan: [] };
-        return buildGraphFromAST(rootNode);
+        return buildGraph(rootNode);
     }, [rootNode]);
 
     useEffect(() => {
@@ -59,33 +59,13 @@ export function OperatorGraph({ rootNode, onPlanGenerated }: Props) {
     );
 }
 
-function buildGraphFromAST(root: QueryNode) {
+function buildGraph(root: QueryNode) {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     const executionPlan: ExecutionStep[] = [];
     let idCounter = 0;
 
-    /**
-     * PASSO 1: Calcular a largura total de cada subárvore recursivamente
-     */
-    const calculateSubtreeWidth = (node: QueryNode): number => {
-        if (node.type === "TABLE") return NODE_WIDTH;
-        if (node.type === "JOIN") {
-            return (
-                calculateSubtreeWidth(node.left) +
-                calculateSubtreeWidth(node.right) +
-                H_GAP
-            );
-        }
-        if ("child" in node && node.child) {
-            return calculateSubtreeWidth(node.child);
-        }
-        return NODE_WIDTH;
-    };
-
-    /**
-     * PASSO 2: Posicionar os nós com base na largura das subárvores[cite: 3]
-     */
+    // Posicionar os nós com base na largura das subárvores
     const traverse = (node: QueryNode, x: number, y: number): string => {
         const id = `n${idCounter++}`;
         const label = getLabel(node);
@@ -96,7 +76,7 @@ function buildGraphFromAST(root: QueryNode) {
             const rightWidth = calculateSubtreeWidth(node.right);
             const totalWidth = leftWidth + rightWidth + H_GAP;
 
-            // Centraliza os ramos filhos em relação ao pai[cite: 3]
+            // Centraliza os ramos filhos em relação ao pai
             const leftX = x - totalWidth / 2 + leftWidth / 2;
             const rightX = x + totalWidth / 2 - rightWidth / 2;
 
@@ -105,6 +85,7 @@ function buildGraphFromAST(root: QueryNode) {
                 leftX,
                 y + NODE_HEIGHT + V_GAP,
             );
+
             const rightChildId = traverse(
                 node.right,
                 rightX,
@@ -120,7 +101,7 @@ function buildGraphFromAST(root: QueryNode) {
 
         nodes.push({
             id,
-            position: { x: x - NODE_WIDTH / 2, y }, // Ajuste para centralizar o nó no ponto X[cite: 3]
+            position: { x: x - NODE_WIDTH / 2, y }, // Ajuste para centralizar o nó no ponto X
             data: { label },
             className,
         });
@@ -129,12 +110,29 @@ function buildGraphFromAST(root: QueryNode) {
         return id;
     };
 
-    // Inicia a construção centralizada em X=0[cite: 3]
+    // Calcular a largura total de cada subárvore recursivamente
+    const calculateSubtreeWidth = (node: QueryNode): number => {
+        if (node.type === "TABLE") return NODE_WIDTH;
+        if (node.type === "JOIN") {
+            return (
+                calculateSubtreeWidth(node.left) +
+                calculateSubtreeWidth(node.right) +
+                H_GAP
+            );
+        }
+        if ("child" in node && node.child) {
+            return calculateSubtreeWidth(node.child);
+        }
+        return NODE_WIDTH;
+    };
+
+    // Inicia a construção centralizada em X=0
     traverse(root, 0, 0);
 
     return { nodes, edges, executionPlan };
 }
 
+// Retorna o texto a ser exibido no nó
 function getLabel(node: QueryNode): string {
     switch (node.type) {
         case "PROJECTION":
@@ -150,6 +148,7 @@ function getLabel(node: QueryNode): string {
     }
 }
 
+// Edge é usando pela lib do grafo
 function makeEdge(source: string, target: string): Edge {
     return {
         id: `${source}-${target}`,
