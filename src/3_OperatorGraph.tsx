@@ -79,7 +79,7 @@ function buildGraph(root: QueryNode) {
 
     // Posicionar os nós com base na largura das subárvores
     const traverse = (node: QueryNode, x: number, y: number): string => {
-        const id = `n${idCounter++}`;
+        const id = `${idCounter++}`;
         const label = getLabel(node);
         const className = `node-${node.type.toLowerCase()}`;
 

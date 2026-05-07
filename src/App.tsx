@@ -150,7 +150,7 @@ export default function App() {
                                 rootNode={activeGraphNode}
                                 onPlanGenerated={(p) => setPlan(p)}
                             />
-                            <ExecutionPlanList steps={plan} />
+                            <ExecutionPlanList rootNode={activeGraphNode} />
                         </Section>
                     </>
                 )}
