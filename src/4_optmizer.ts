@@ -1,25 +1,25 @@
 import type { QueryNode } from "./helpers/types";
 
 export default function optimize(root: QueryNode): QueryNode {
-    // 1. Primeiro descemos as seleções (Passo 2)
+    // Primeiro descemos as seleções
     let optimized = pushdownSelections(root);
 
-    // 2. Depois aplicamos as projeções (Passo 3)
+    // Depois aplicamos as projeções
     // Passamos as colunas vazias; a coleta começa no nó PROJECTION raiz
     optimized = pushdownProjections(optimized, []);
 
     return optimized;
 }
 
-// Ajuste para o Passo 2: Mantém o Sigma colado na Tabela
+// Mantém o Sigma colado na Tabela
 function pushdownSelections(node: QueryNode): QueryNode {
-    if (node.type === "PROJECTION") {
-        return { ...node, child: pushdownSelections(node.child) };
-    }
-
     if (node.type === "SELECTION") {
         const conditions = node.params.condition.split(" ∧ ");
         return findHomeForSelections(node.child, conditions);
+    }
+
+    if (node.type === "PROJECTION") {
+        return { ...node, child: pushdownSelections(node.child) };
     }
 
     if (node.type === "JOIN") {
@@ -93,13 +93,16 @@ function findHomeForSelections(
         const relevant = conditions.filter((c) =>
             c.toLowerCase().startsWith(tableName + "."),
         );
+
         if (relevant.length === 0) return node;
+
         return {
             type: "SELECTION",
             params: { condition: relevant.join(" ∧ ") },
             child: node,
         };
     }
+
     if (node.type === "JOIN") {
         return {
             ...node,
@@ -107,6 +110,7 @@ function findHomeForSelections(
             right: findHomeForSelections(node.right, conditions),
         };
     }
+
     return node;
 }
 

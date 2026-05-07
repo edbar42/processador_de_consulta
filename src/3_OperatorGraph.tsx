@@ -160,7 +160,7 @@ function makeEdge(source: string, target: string): Edge {
 }
 
 const styles = `
-  .graph-wrapper { width: 100%; height: 550px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
+  .graph-wrapper { width: 100%; height: 790px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
   .node-projection { background: #6366f1 !important; color: white !important; border-radius: 8px; font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center; width: ${NODE_WIDTH}px; height: ${NODE_HEIGHT}px; }
   .node-selection { background: #10b981 !important; color: white !important; border-radius: 8px; font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center; width: ${NODE_WIDTH}px; height: ${NODE_HEIGHT}px; }
   .node-join { background: #f97316 !important; color: white !important; border-radius: 8px; font-size: 11px; font-weight: 500; display: flex; align-items: center; justify-content: center; width: ${NODE_WIDTH}px; height: ${NODE_HEIGHT}px; }
