@@ -1,31 +1,66 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import "./App.css";
 import { parseSqlQuery } from "./1_parser";
 import { buildCanonicalGraph } from "./2_grafo_base";
 import { stringifyGraph } from "./2_translator";
-import { OperatorGraph, type ExecutionStep } from "./3_OperatorGraph";
+import { OperatorGraph } from "./3_OperatorGraph";
 import { ExecutionPlanList } from "./5_ExecutionPlan";
 import type { ParsedQuery } from "./helpers/types";
 import optimize from "./4_optmizer";
 import { TestQueries } from "./helpers/testQueries";
-import formatSQLQuery from "./helpers/queryStringFormatter";
 
 export default function App() {
     const [input, setInput] = useState(TestQueries[0]?.query ?? "");
     const [submitted, setSubmitted] = useState(input);
     const [showOptimizedGraph, setShowOptimizedGraph] = useState(false);
-    const [plan, setPlan] = useState<ExecutionStep[]>([]);
+
+    console.log(
+        "\x1b[33m%s\x1b[0m",
+        `
+        ------------------------------------------------
+        -----------------  NOVA QUERY  -----------------
+        ------------------------------------------------
+        `,
+    );
 
     // 1. Valida e faz parser: SQL -> ParsedQuery
+    console.log(
+        "\x1b[33m%s\x1b[0m",
+        `
+        1_parser
+        `,
+    );
+
     const parsed = parseSqlQuery(submitted) as ParsedQuery;
 
     // 2. Construção do Grafo Canônico
+    console.log(
+        "\x1b[33m%s\x1b[0m",
+        `
+        2_grafo_base
+        `,
+    );
+
     const canonicalGraph = buildCanonicalGraph(parsed) || null;
 
     // 3. Aplicação das Heurísticas
+    console.log(
+        "\x1b[33m%s\x1b[0m",
+        `
+        4_optimize
+        `,
+    );
+
     const optimizedGraph = optimize(canonicalGraph);
 
     // 4. Tradução para Texto (Álgebra)
+    console.log(
+        "\x1b[33m%s\x1b[0m",
+        `
+        2_translator
+        `,
+    );
+
     const algebraOriginal = stringifyGraph(canonicalGraph);
     const algebraOptimized = stringifyGraph(optimizedGraph);
 
@@ -69,7 +104,7 @@ export default function App() {
                     </div>
                     <textarea
                         className="text-area"
-                        value={formatSQLQuery(input)}
+                        value={input}
                         onChange={(e) => setInput(e.target.value)}
                         rows={7}
                         style={{ marginTop: "10px" }}
@@ -146,10 +181,7 @@ export default function App() {
                                 </span>
                             </div>
 
-                            <OperatorGraph
-                                rootNode={activeGraphNode}
-                                onPlanGenerated={(p) => setPlan(p)}
-                            />
+                            <OperatorGraph rootNode={activeGraphNode} />
                             <ExecutionPlanList rootNode={activeGraphNode} />
                         </Section>
                     </>

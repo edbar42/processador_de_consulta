@@ -1,12 +1,6 @@
 import type { QueryNode } from "./helpers/types";
 
 export default function optimize(root: QueryNode): QueryNode {
-    console.log(
-        "\x1b[33m%s\x1b[0m",
-        `
-        4_optimize
-        `,
-    );
     // Primeiro descemos as seleções
     let optimized = pushdownSelections(root);
 

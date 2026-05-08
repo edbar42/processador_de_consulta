@@ -4,14 +4,17 @@ import type { JoinInfo, ParsedQuery, WhereCondition } from "./helpers/types";
 // PRINCIPAL  ===================================================================
 
 export function parseSqlQuery(input: string) {
-    console.log(
-        "\x1b[33m%s\x1b[0m",
-        `
-        1_parser
-        `,
-    );
+    const normalized = input
+        .replace(/\((.*?)\)/g, "$1")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
 
-    const normalized = input.trim().toLowerCase().replace(/\s+/g, " ");
+    // Todo parênese abre e fecha?
+    if (!checkParenteses(input)) {
+        return createError("Parênteses desbalanceados na consulta SQL");
+    }
+
     const sqlRegex = /^select\s+(.+?)\s+from\s+(.+?)(?:\s+where\s+(.*))?$/i;
     const match = normalized.match(sqlRegex);
 
@@ -194,6 +197,21 @@ function validateWheres(
             );
         }
     }
+}
+
+function checkParenteses(input: string): boolean {
+    const stack: string[] = [];
+
+    for (const char of input) {
+        if (char === "(") {
+            stack.push(char);
+        } else if (char === ")") {
+            if (stack.length === 0) return false;
+            stack.pop();
+        }
+    }
+
+    return stack.length === 0;
 }
 
 function createError(msg: string): ParsedQuery {

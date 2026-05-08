@@ -2,12 +2,6 @@ import printGraph from "./helpers/printGraph";
 import type { ParsedQuery, QueryNode } from "./helpers/types";
 
 export function buildCanonicalGraph(query: ParsedQuery): QueryNode {
-    console.log(
-        "\x1b[33m%s\x1b[0m",
-        `
-        2_grafo_base
-        `,
-    );
     // 1 - Começando com o FROM. Ele é a base da tabela
     let root: QueryNode = {
         type: "TABLE",

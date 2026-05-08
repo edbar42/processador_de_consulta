@@ -1,19 +1,11 @@
 import type { Edge, Node } from "@xyflow/react";
 import { Background, Controls, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useMemo, useEffect } from "react";
+import { useMemo } from "react";
 import type { QueryNode } from "./helpers/types";
-
-export interface ExecutionStep {
-    id: string;
-    type: string;
-    label: string;
-    levelY: number;
-}
 
 interface Props {
     rootNode: QueryNode | null;
-    onPlanGenerated?: (plan: ExecutionStep[]) => void;
 }
 
 const NODE_WIDTH = 220;
@@ -21,17 +13,18 @@ const NODE_HEIGHT = 50;
 const H_GAP = 60; // Espaço horizontal entre subárvores
 const V_GAP = 60; // Espaço vertical entre níveis
 
-export function OperatorGraph({ rootNode, onPlanGenerated }: Props) {
-    const { nodes, edges, executionPlan } = useMemo(() => {
-        if (!rootNode) return { nodes: [], edges: [], executionPlan: [] };
+export function OperatorGraph({ rootNode }: Props) {
+    console.log(
+        "\x1b[33m%s\x1b[0m",
+        `
+        3_OperatorGraph.traverse()
+        `,
+    );
+
+    const { nodes, edges } = useMemo(() => {
+        if (!rootNode) return { nodes: [], edges: [] };
         return buildGraph(rootNode);
     }, [rootNode]);
-
-    useEffect(() => {
-        if (onPlanGenerated && rootNode) {
-            onPlanGenerated(executionPlan);
-        }
-    }, [executionPlan, onPlanGenerated, rootNode]);
 
     if (!rootNode) {
         return (
@@ -44,8 +37,8 @@ export function OperatorGraph({ rootNode, onPlanGenerated }: Props) {
     return (
         <div className="graph-wrapper">
             <ReactFlow
-                nodes={nodes}
-                edges={edges}
+                nodes={nodes as Node[]}
+                edges={edges as Edge[]}
                 fitView
                 fitViewOptions={{ padding: 0.2 }}
                 nodesDraggable={true}
@@ -65,16 +58,8 @@ export function OperatorGraph({ rootNode, onPlanGenerated }: Props) {
 }
 
 function buildGraph(root: QueryNode) {
-    console.log(
-        "\x1b[33m%s\x1b[0m",
-        `
-        3_OperatorGraph.traverse()
-        `,
-    );
-
     const nodes: Node[] = [];
     const edges: Edge[] = [];
-    const executionPlan: ExecutionStep[] = [];
     let idCounter = 0;
 
     // Posicionar os nós com base na largura das subárvores
@@ -120,7 +105,6 @@ function buildGraph(root: QueryNode) {
             className,
         });
 
-        executionPlan.push({ id, type: node.type, label, levelY: y });
         return id;
     };
 
@@ -143,7 +127,7 @@ function buildGraph(root: QueryNode) {
     // Inicia a construção centralizada em X=0
     traverse(root, 0, 0);
 
-    return { nodes, edges, executionPlan };
+    return { nodes, edges };
 }
 
 // Retorna o texto a ser exibido no nó

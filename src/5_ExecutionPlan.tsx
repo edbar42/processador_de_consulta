@@ -66,19 +66,20 @@ export function ExecutionPlanList({ rootNode }: Props) {
     );
 }
 
-/**
- * Calcula a altura de um nó para definir prioridade de leitura
- */
+// Calcula a altura de um nó para definir prioridade de leitura
 function getNodeHeight(node: QueryNode): number {
     if (node.type === "TABLE") return 1;
+
     if (node.type === "JOIN") {
         return (
             Math.max(getNodeHeight(node.left), getNodeHeight(node.right)) + 1
         );
     }
+
     if ("child" in node && node.child) {
         return getNodeHeight(node.child) + 1;
     }
+
     return 0;
 }
 
@@ -86,13 +87,16 @@ function generatePlan(node: QueryNode | null): ExecutionStep[] {
     const steps: ExecutionStep[] = [];
     let counter = 1;
 
+    if (node) walk(node);
+
+    return steps;
+
     function walk(currentNode: QueryNode) {
         if (currentNode.type === "JOIN") {
             const leftH = getNodeHeight(currentNode.left);
             const rightH = getNodeHeight(currentNode.right);
 
-            // Se o ramo direito for mais profundo (como no seu exemplo de PEDIDO),
-            // ele deve ser processado/lido primeiro no plano.
+            // Se o ramo direito for mais profundo, ele deve ser processado primeiro
             if (rightH > leftH) {
                 walk(currentNode.right);
                 walk(currentNode.left);
@@ -110,9 +114,6 @@ function generatePlan(node: QueryNode | null): ExecutionStep[] {
             label: getNodeLabel(currentNode),
         });
     }
-
-    if (node) walk(node);
-    return steps;
 }
 
 function getNodeLabel(node: QueryNode): string {
